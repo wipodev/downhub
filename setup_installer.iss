@@ -15,28 +15,21 @@ Name: "es"; MessagesFile: "compiler:Languages\Spanish.isl"
 [Files]
 Source: "build\exe.win-amd64-3.11\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
-Source: "dist\DownTube.crx"; DestDir: "{userdesktop}"; Flags: ignoreversion; AfterInstall: extensionInstall
+Source: "extension\*"; DestDir: "{app}\extension"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+Source: "dummy.txt"; DestDir: "{app}"; Flags: dontcopy; AfterInstall: extensionInstall
 
 [Icons]
 Name: "{commonstartup}\DownloadService"; Filename: "{app}\DownloadService.exe"; WorkingDir: "{app}"
 
 [Code]
-var
-  ErrorCode: Integer;
-  ChromeProfile: String;
-
 procedure extensionInstall();
 begin
   MsgBox('Para instalar la extensión en Google Chrome:' + #13#10 +
          '1. Abra Google Chrome.' + #13#10 +
          '2. Escriba "chrome://extensions" en la barra de direcciones y presione Enter.' + #13#10 +
-         '3. Arrastre el archivo DownTube.crx desde su escritorio a la ventana de extensiones.', 
+         '3. Active el modo desarrollador.' + #13#10 +
+         '4. Haz clic en "Cargar extension sin empaquetar".' + #13#10 +
+         '5. Selecciona la carpeta de la extensión en "' + ExpandConstant('{app}') + '\extension" y haz clic en "Cargar".',
          mbInformation, MB_OK);
-
-  
-  ChromeProfile := '--profile-directory="Default"';
-  if not ShellExec('', 'chrome.exe', 'chrome://extensions' + ChromeProfile, '', SW_SHOWNORMAL, ewNoWait, ErrorCode) then
-  begin
-    MsgBox('Error al intentar abrir Chrome: ' + SysErrorMessage(ErrorCode), mbError, MB_OK);
-  end;
 end;
