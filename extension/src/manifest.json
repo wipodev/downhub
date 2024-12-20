@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "DownTube",
+  "version": "0.0.1",
+  "description": "DownTube extension",
+  "permissions": ["http://127.0.0.1:8000/"],
+  "background": {
+    "service_worker": "background.js"
+  }
+}
