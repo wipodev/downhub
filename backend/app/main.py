@@ -4,7 +4,6 @@ import sys
 
 # third-party modules
 from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from yt_dlp import YoutubeDL
 import logging
@@ -14,15 +13,6 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(current_dir)
 
 app = FastAPI()
-
-# Allow CORS so the Chrome extension can make requests
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 class VideoRequest(BaseModel):
     url: str

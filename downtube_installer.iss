@@ -8,16 +8,20 @@ OutputBaseFilename=DownloadServiceInstaller
 Compression=lzma
 SolidCompression=yes
 
-[Files]
-; Copia el ejecutable a la carpeta de inicio del usuario actual
-Source: "backend\dist\DownloadService.exe"; DestDir: "{userstartup}"; Flags: ignoreversion
+[Languages]
+Name: "en"; MessagesFile: "compiler:Default.isl"
+Name: "es"; MessagesFile: "compiler:Languages\Spanish.isl"
 
-; Copia el archivo CRX a una carpeta en Archivos de Programa
+[Files]
+Source: "backend\build\exe.win-amd64-3.11\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+
 Source: "extension\DownTube.crx"; DestDir: "{userdesktop}"; Flags: ignoreversion; AfterInstall: extensionInstall
 
+[Icons]
+Name: "{commonstartup}\DownloadService"; Filename: "{app}\DownloadService.exe"; WorkingDir: "{app}"
+
 [Run]
-; Ejecuta el servicio automáticamente después de la instalación
-Filename: "{userstartup}\DownloadService.exe"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\DownloadService.exe"; Flags: nowait postinstall skipifsilent
 
 [Code]
 procedure extensionInstall();
