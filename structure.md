@@ -4,12 +4,13 @@
         └── __init__.py
         └── main.py
     └── extension
+        └── icons
         └── background.js
         └── content.js
-        └── icons
         └── manifest.json
         └── style.css
     └── .gitignore
+    └── build.py
     └── README.md
     └── requirements.txt
     └── setup_api.py
