@@ -1,7 +1,7 @@
 from cx_Freeze import setup, Executable
 import os
 
-main_script = "app/main.py"
+main_script = "api/main.py"
 
 build_options = {
     "packages": ["os", "sys", "fastapi", "yt_dlp", "uvicorn"],
@@ -19,7 +19,7 @@ executables = [
 
 setup(
     name="DownloadService",
-    version="0.0.1",
+    version="0.0.2",
     description="YouTube video download service",
     options={"build_exe": build_options},
     executables=executables,

@@ -1,3 +1,0 @@
-[tool.taskipy.tasks]
-build = "python setup.py build"
-run = "./build/DownloadService.exe"
