@@ -1,0 +1,3 @@
+[tool.taskipy.tasks]
+build = "pyinstaller --onefile --noconsole --name DownloadService app/main.py"
+run = "./dist/DownloadService.exe"
