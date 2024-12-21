@@ -7,6 +7,7 @@ OutputDir=Output
 OutputBaseFilename=DownloadServiceInstaller
 Compression=lzma
 SolidCompression=yes
+UninstallDisplayIcon={app}\icon.ico
 
 [Languages]
 Name: "en"; MessagesFile: "compiler:Default.isl"
@@ -14,13 +15,15 @@ Name: "es"; MessagesFile: "compiler:Languages\Spanish.isl"
 
 [Files]
 Source: "build\exe.win-amd64-3.11\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-
 Source: "extension\*"; DestDir: "{app}\extension"; Flags: ignoreversion recursesubdirs createallsubdirs
-
 Source: "README.md"; DestDir: "{app}"; Flags: ignoreversion; AfterInstall: extensionInstall
+Source: "assets\icon.ico"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{commonstartup}\DownloadService"; Filename: "{app}\DownloadService.exe"; WorkingDir: "{app}"
+
+[Run]
+Filename: "{app}\DownloadService.exe"; Description: "Run DownloadService"; Flags: nowait postinstall skipifsilent
 
 [Code]
 procedure extensionInstall();
