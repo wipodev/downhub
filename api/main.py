@@ -5,6 +5,7 @@ import logging
 
 # third-party modules
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from yt_dlp import YoutubeDL
 from uvicorn import Config, Server
@@ -26,16 +27,27 @@ sys.path.append(current_dir)
 
 app = FastAPI()
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 class VideoRequest(BaseModel):
     url: str
 
 @app.post("/download")
 def download_video(request: VideoRequest):
     downloads_folder = os.path.join(os.path.expanduser("~"), "Downloads")
+
+    base_dir = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, 'frozen', False) else __file__))
     
     ydl_opts = {
         'outtmpl': os.path.join(downloads_folder, '%(title)s.%(ext)s'),
         'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+        'ffmpeg_location': os.path.join(base_dir, 'bin'),
     }
 
     try:
