@@ -3,7 +3,10 @@ from cx_Freeze import setup, Executable
 build_options = {
     "packages": ["os", "sys", "fastapi", "yt_dlp", "uvicorn"],
     "excludes": ["tkinter"],
-    "include_files": [],
+    "include_files": [
+      ("api/bin/ffmpeg.exe", "bin/ffmpeg.exe"),
+      ("api/bin/ffprobe.exe", "bin/ffprobe.exe"),
+    ],
 }
 
 executables = [
