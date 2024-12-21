@@ -17,7 +17,7 @@ Source: "build\exe.win-amd64-3.11\*"; DestDir: "{app}"; Flags: ignoreversion rec
 
 Source: "extension\*"; DestDir: "{app}\extension"; Flags: ignoreversion recursesubdirs createallsubdirs
 
-Source: "dummy.txt"; DestDir: "{app}"; Flags: dontcopy; AfterInstall: extensionInstall
+Source: "README.md"; DestDir: "{app}"; Flags: ignoreversion; AfterInstall: extensionInstall
 
 [Icons]
 Name: "{commonstartup}\DownloadService"; Filename: "{app}\DownloadService.exe"; WorkingDir: "{app}"
