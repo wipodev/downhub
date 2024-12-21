@@ -3,8 +3,13 @@
     └── api
         └── __init__.py
         └── main.py
+    └── assets
+        └── icon.svg
     └── extension
         └── icons
+            └── icon-16x16.png
+            └── icon-48x48.png
+            └── icon-128x128.png
         └── background.js
         └── content.js
         └── manifest.json
