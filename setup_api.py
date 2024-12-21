@@ -1,7 +1,4 @@
 from cx_Freeze import setup, Executable
-import os
-
-main_script = "api/main.py"
 
 build_options = {
     "packages": ["os", "sys", "fastapi", "yt_dlp", "uvicorn"],
@@ -11,9 +8,10 @@ build_options = {
 
 executables = [
     Executable(
-        main_script,
+        script="api/main.py",
         target_name="DownloadService.exe",
-        base=None,
+        icon="assets/icon.ico",
+        base="win32gui",
     )
 ]
 
