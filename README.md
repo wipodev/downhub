@@ -40,6 +40,8 @@ DownTube is a project that combines a Python backend and a Chrome extension to d
   - `uvicorn`
   - `pydantic`
 - Windows operating system (for the installer)
+- ffmpeg.exe (add it to the `api/bin` folder)
+- ffprobe.exe (add it to the `api/bin` folder)
 
 ### Chrome Extension
 
