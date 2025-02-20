@@ -14,10 +14,11 @@ Name: "en"; MessagesFile: "compiler:Default.isl"
 Name: "es"; MessagesFile: "compiler:Languages\Spanish.isl"
 
 [Files]
-Source: "build\exe.win-amd64-3.11\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "extension\*"; DestDir: "{app}\extension"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "build\exe.win-amd64-3.11\*"; DestDir: "{app}"; Flags: onlyifdoesntexist recursesubdirs createallsubdirs
+Source: "build\exe.win-amd64-3.11\DownloadService.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "extension\*"; DestDir: "{app}\extension"; Flags: comparetimestamp recursesubdirs createallsubdirs
 Source: "README.md"; DestDir: "{app}"; Flags: ignoreversion; AfterInstall: extensionInstall
-Source: "assets\icon.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "assets\icon.ico"; DestDir: "{app}"; Flags: onlyifdestfileexists
 
 [Icons]
 Name: "{commonstartup}\DownloadService"; Filename: "{app}\DownloadService.exe"; WorkingDir: "{app}"
