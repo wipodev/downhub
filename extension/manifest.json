@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "DownTube",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Extension to download YouTube videos using a local backend.",
   "permissions": ["tabs"],
   "host_permissions": ["https://www.youtube.com/*"],

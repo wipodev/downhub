@@ -20,7 +20,7 @@ executables = [
 
 setup(
     name="DownloadService",
-    version="0.0.2",
+    version="0.0.3",
     description="YouTube video download service",
     options={"build_exe": build_options},
     executables=executables,

@@ -96,7 +96,7 @@ Once installed, the extension will be active on YouTube pages.
 ## Usage
 
 1. Open any video on YouTube.
-2. You will see a floating "Download Video" button at the bottom-right corner.
+2. You will see a new button with the extension icon in the video control menu.
 3. Click the button to start the download.
 4. The video will be saved to your system's downloads folder.
 
@@ -112,7 +112,7 @@ The `api/main.py` file defines the backend handling download requests. You can c
 
 - **background.js**: Handles global events, such as tab URL changes.
 - **content.js**: Defines the page interaction logic on YouTube. Modify the `injectDownloadButton` function to customize the download button.
-- **style.css**: Adjust the styling of the button and notifications.
+- **style.css**: Adjust the styling of the notifications.
 
 ---
 
@@ -131,4 +131,10 @@ The `api/main.py` file defines the backend handling download requests. You can c
 
 ## License
 
-This project is distributed under MIT.
+This project is distributed under the MIT license.
+
+## Disclaimer
+
+This project is not affiliated, endorsed, or associated with YouTube or Google in any way. It is provided solely for educational and learning purposes. Misuse of this tool to download content without authorization may violate YouTube's terms of service. The author is not responsible for any use of this software.
+
+If you choose to use this project, ensure that you comply with all copyright laws and YouTube's terms of service.

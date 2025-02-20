@@ -1,6 +1,6 @@
 [Setup]
 AppName=DownloadService
-AppVersion=0.0.2
+AppVersion=0.0.3
 DefaultDirName={autopf}\DownloadService
 DefaultGroupName=DownloadService
 OutputDir=Output
