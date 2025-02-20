@@ -2,6 +2,7 @@
 import os
 import sys
 import logging
+import time
 
 # third-party modules
 from fastapi import FastAPI, HTTPException
@@ -38,6 +39,10 @@ app.add_middleware(
 class VideoRequest(BaseModel):
     url: str
 
+def update_file_timestamp(file_path):
+    current_time = time.time()
+    os.utime(file_path, (current_time, current_time))
+
 @app.post("/download")
 def download_video(request: VideoRequest):
     downloads_folder = os.path.join(os.path.expanduser("~"), "Downloads")
@@ -52,7 +57,10 @@ def download_video(request: VideoRequest):
 
     try:
         with YoutubeDL(ydl_opts) as ydl:
-            ydl.download([request.url])
+            info = ydl.extract_info(request.url, download=True)
+            file_path = os.path.join(downloads_folder, f"{info['title']}.{info['ext']}")
+            update_file_timestamp(file_path)
+
         logging.info(f"Video downloaded: {request.url}")
         return {"message": "Download completed", "location": downloads_folder}
     except Exception as e:
