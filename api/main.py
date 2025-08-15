@@ -51,7 +51,21 @@ def download_video(request: VideoRequest):
     
     ydl_opts = {
         'outtmpl': os.path.join(downloads_folder, '%(title)s.%(ext)s'),
+        "restrictfilenames": True,
         'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+        "merge_output_format": "mp4",
+        "hls_prefer_native": True,
+        "continuedl": True,
+        "fragment_retries": 10,
+        "retries": 5,
+        "concurrent_fragment_downloads": 5,
+        "quiet": True,
+        "noprogress": True,
+        "http_headers": {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                          "AppleWebKit/537.36 (KHTML, like Gecko) "
+                          "Chrome/120.0.0.0 Safari/537.36"
+        },
         'ffmpeg_location': os.path.join(base_dir, 'bin'),
     }
 
