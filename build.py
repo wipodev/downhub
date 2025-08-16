@@ -12,11 +12,11 @@ def run_command(command):
 def main():
     local_appdata = os.environ["LOCALAPPDATA"]
 
+    print("Generating extension key and updating files...")
+    run_command("python setup_ext.py")
+
     print("Compiling API...")
     run_command("python setup_api.py build")
-    
-    print("Packaging extension...")
-    run_command("python setup_ext.py")
     
     print("Creating installer...")
     inno_path = os.path.join(local_appdata, r"Programs\Inno Setup 6\ISCC.exe")

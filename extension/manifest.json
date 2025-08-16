@@ -1,9 +1,13 @@
 {
   "manifest_version": 3,
-  "name": "DownTube",
+  "name": "DownHub",
   "version": "0.0.3",
-  "description": "Extension to download YouTube videos using a local backend.",
-  "permissions": ["scripting", "activeTab"],
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAiLOBGHygOMJT+xprwOVvQVHOrcnkUUO+9RdmKOCLgdt3haMf6kyM3+2pvzd1h/ANWrBS8rMErX5Ifao5BRtWOyH5CdrkwEtOVLTKSQt4Kz1p630xTJXSAKmN7rI6VQ3L4ssxBElF9J3XDS2zazg0+03SBQSCMkCL4Q3AOr442Q2ByIy0NK/KyJphk9dL0TQufmjOj4mfhE0x3B0wcNuFkS5NOyVYVCautOcjUElAOMPSDv4s8b2/wjNha4ERrFFi4/sPPBspFJ8nOrYG4aXiNh/nDfjQbgmoEBmMdfsNXoNHbeZnD0cDYAYTA8LCRV4vKxK2LUqUdeW8Ybn890cbMQIDAQAB",
+  "description": "Extension to download YouTube/kick videos using a local backend.",
+  "permissions": [
+    "scripting",
+    "activeTab"
+  ],
   "host_permissions": [
     "https://www.youtube.com/*",
     "https://youtube.com/*",
@@ -30,8 +34,12 @@
         "https://www.kick.com/*",
         "https://kick.com/*"
       ],
-      "js": ["content.js"],
-      "css": ["toast.css"],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "toast.css"
+      ],
       "run_at": "document_idle"
     }
   ]

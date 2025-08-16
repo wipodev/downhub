@@ -3,7 +3,7 @@ AppName=DownHubService
 AppVersion=0.0.3
 DefaultDirName={autopf}\DownHubService
 DefaultGroupName=DownHubService
-OutputDir=Output
+OutputDir=dist
 OutputBaseFilename=DownHubServiceInstaller
 Compression=lzma
 SolidCompression=yes
@@ -22,16 +22,22 @@ Source: "build\exe.win-amd64-3.11\DownHubService.exe"; DestDir: "{app}"; Flags: 
 Source: "build\exe.win-amd64-3.11\DownHubGUI.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "extension\*"; DestDir: "{app}\extension"; Flags: comparetimestamp recursesubdirs createallsubdirs
 Source: "README.md"; DestDir: "{app}"; Flags: ignoreversion; AfterInstall: extensionInstall
-Source: "assets\icon.ico"; DestDir: "{app}"; Flags: onlyifdestfileexists
 
 [Icons]
 ; Servicio API en carpeta de inicio
 Name: "{commonstartup}\DownHubService"; Filename: "{app}\DownHubService.exe"; WorkingDir: "{app}"
 ; GUI en escritorio
-Name: "{commondesktop}\DownHubGUI"; Filename: "{app}\DownHubGUI.exe"; WorkingDir: "{app}"; IconFilename: "{app}\icon.ico"
+Name: "{commondesktop}\DownHubGUI"; Filename: "{app}\DownHubGUI.exe"; WorkingDir: "{app}"
 
 [Run]
+; 1. Durante instalación: detener cualquier DownHubService previo antes de copiar archivos
+Filename: "taskkill"; Parameters: "/F /IM DownHubService.exe"; Flags: runhidden; StatusMsg: "Finalizando DownHubService en ejecución..."
+; 2. Después de instalar, lanzar el servicio
 Filename: "{app}\DownHubService.exe"; Description: "Run DownHubService"; Flags: nowait postinstall skipifsilent
+
+[UninstallRun]
+; Finalizar DownHubService si está en ejecución antes de desinstalar
+Filename: "taskkill"; Parameters: "/F /IM DownHubService.exe"; Flags: runhidden
 
 [Code]
 procedure extensionInstall();
