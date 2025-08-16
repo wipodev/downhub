@@ -37,7 +37,9 @@ app.add_middleware(
     allow_origins=[
         "chrome-extension://aoajebnokccpepbkcdinhkpclikhmink",
         "http://127.0.0.1",
-        "http://localhost"
+        "http://localhost",
+        "http://127.0.0.1:8000",
+        "http://localhost:8000",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -58,15 +60,15 @@ def download_job(task_id, url):
     ydl_opts = {
         'outtmpl': os.path.join(downloads_folder, '%(title)s.%(ext)s'),
         "restrictfilenames": True,
-        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+        'format': 'bestvideo+bestaudio/best',
         "merge_output_format": "mp4",
         "hls_prefer_native": True,
         "continuedl": True,
         "fragment_retries": 10,
         "retries": 5,
         "concurrent_fragment_downloads": 5,
-        "quiet": True,
-        "noprogress": True,
+        "quiet": False,
+        "noprogress": False,
         "no_mtime": True,
         "http_headers": {
             "User-Agent": (

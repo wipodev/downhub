@@ -1,27 +1,34 @@
 // background.js
+const API_BASE = "http://127.0.0.1:8000";
 
-// Relay requests to the local API (FastAPI) to avoid CORS surprises and keep logic centralized.
-chrome.runtime.onMessage.addListener(async (msg, _sender, sendResponse) => {
-  if (msg?.type === "DOWNLOAD_URL" && typeof msg.url === "string") {
-    try {
-      const res = await fetch("http://127.0.0.1:8000/download", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: msg.url }),
-      });
-
-      let data = null;
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg?.type === "DOWNLOAD_URL") {
+    (async () => {
       try {
-        data = await res.json();
-      } catch {
-        data = { message: "No JSON body" };
+        const r = await fetch(`${API_BASE}/download`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: msg.url }),
+        });
+        const data = await r.json().catch(() => ({}));
+        sendResponse({ ok: r.ok, data, status: r.status });
+      } catch (e) {
+        sendResponse({ ok: false, error: String(e) });
       }
+    })();
+    return true;
+  }
 
-      sendResponse({ ok: res.ok, status: res.status, data });
-    } catch (err) {
-      sendResponse({ ok: false, status: 0, error: String(err) });
-    }
-    // Keep the message channel open for the async response
+  if (msg?.type === "STATUS_TASK" && msg?.taskId) {
+    (async () => {
+      try {
+        const r = await fetch(`${API_BASE}/status/${msg.taskId}`);
+        const data = await r.json().catch(() => ({}));
+        sendResponse({ ok: r.ok, data, status: r.status });
+      } catch (e) {
+        sendResponse({ ok: false, error: String(e) });
+      }
+    })();
     return true;
   }
 });
