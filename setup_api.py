@@ -13,13 +13,13 @@ executables = [
     Executable(
         script="api/main.py",
         target_name="DownHubService.exe",
-        icon="assets/icon.ico",
+        icon="assets/icon_service.ico",
         base="win32gui",
     ),
     Executable(
         script="api/gui.py",
         target_name="DownHubGUI.exe",
-        icon="assets/icon.ico",
+        icon="assets/icon_gui.ico",
         base="win32gui",
     )
 ]
@@ -27,7 +27,7 @@ executables = [
 setup(
     name="DownHubTools",
     version="0.0.3",
-    description="YouTube/Kick video download service + GUI",
+    description="DownHub video download service",
     options={"build_exe": build_options},
     executables=executables,
 )

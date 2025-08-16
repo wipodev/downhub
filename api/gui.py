@@ -72,7 +72,7 @@ root.geometry("500x300")
 root.resizable(False, False)
 
 # Set icon
-icon_path = os.path.join(os.path.dirname(__file__), "..", "assets", "icon2.ico")
+icon_path = os.path.join(os.path.dirname(__file__), "..", "assets", "favicon.ico")
 if os.path.exists(icon_path):
     root.iconbitmap(icon_path)
 

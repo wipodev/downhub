@@ -7,7 +7,8 @@ OutputDir=dist
 OutputBaseFilename=DownHubServiceInstaller
 Compression=lzma
 SolidCompression=yes
-UninstallDisplayIcon={app}\icon.ico
+UninstallDisplayIcon={app}\DownHubGUI.exe
+SetupIconFile=assets\icon_installer.ico
 
 [Languages]
 Name: "en"; MessagesFile: "compiler:Default.isl"
