@@ -3,6 +3,9 @@ import os
 import sys
 import logging
 import time
+import traceback
+import threading
+import uuid
 
 # third-party modules
 from fastapi import FastAPI, HTTPException
@@ -11,7 +14,8 @@ from pydantic import BaseModel
 from yt_dlp import YoutubeDL
 from uvicorn import Config, Server
 
-log_file = os.path.join(os.path.expanduser("~"), "DownloadService.log")
+# --- Logging config ---
+log_file = os.path.join(os.path.expanduser("~"), "DownHubService.log")
 logging.basicConfig(
     filename=log_file,
     level=logging.INFO,
@@ -21,7 +25,7 @@ logging.basicConfig(
 sys.stdout = open(log_file, "a")
 sys.stderr = open(log_file, "a")
 
-logging.info("Starting DownloadService...")
+logging.info("Starting DownHubService...")
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(current_dir)
@@ -30,7 +34,11 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "chrome-extension://mppaemmnjblpfpiijkbmgfbkmkgjlean",
+        "http://127.0.0.1",
+        "http://localhost"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -39,16 +47,14 @@ app.add_middleware(
 class VideoRequest(BaseModel):
     url: str
 
-def update_file_timestamp(file_path):
-    current_time = time.time()
-    os.utime(file_path, (current_time, current_time))
+tasks = {}  # {task_id: {"status": "pending"|"completed"|"error", "file": str|None, "error_msg": str|None}}
 
-@app.post("/download")
-def download_video(request: VideoRequest):
+def download_job(task_id, url):
     downloads_folder = os.path.join(os.path.expanduser("~"), "Downloads")
+    base_dir = os.path.dirname(
+        os.path.abspath(sys.executable if getattr(sys, 'frozen', False) else __file__)
+    )
 
-    base_dir = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, 'frozen', False) else __file__))
-    
     ydl_opts = {
         'outtmpl': os.path.join(downloads_folder, '%(title)s.%(ext)s'),
         "restrictfilenames": True,
@@ -61,25 +67,47 @@ def download_video(request: VideoRequest):
         "concurrent_fragment_downloads": 5,
         "quiet": True,
         "noprogress": True,
+        "no_mtime": True,
         "http_headers": {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                          "AppleWebKit/537.36 (KHTML, like Gecko) "
-                          "Chrome/120.0.0.0 Safari/537.36"
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0.0.0 Safari/537.36"
+            )
         },
         'ffmpeg_location': os.path.join(base_dir, 'bin'),
     }
 
     try:
         with YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(request.url, download=True)
+            info = ydl.extract_info(url, download=True)
             file_path = os.path.join(downloads_folder, f"{info['title']}.{info['ext']}")
-            update_file_timestamp(file_path)
 
-        logging.info(f"Video downloaded: {request.url}")
-        return {"message": "Download completed", "location": downloads_folder}
+        tasks[task_id]["status"] = "completed"
+        tasks[task_id]["file"] = file_path
+        logging.info(f"Download completed for task {task_id}")
     except Exception as e:
-        logging.error(f"Error downloading video: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error downloading video: {str(e)}")
+        tasks[task_id]["status"] = "error"
+        tasks[task_id]["error_msg"] = str(e)
+        logging.error(f"Error in task {task_id}: {e}")
+        logging.error(traceback.format_exc())
+
+@app.post("/download")
+def start_download(request: VideoRequest):
+    task_id = str(uuid.uuid4())
+    tasks[task_id] = {"status": "pending", "file": None, "error_msg": None}
+
+    threading.Thread(target=download_job, args=(task_id, request.url), daemon=True).start()
+
+    logging.info(f"Download started for {request.url} as task {task_id}")
+    return {"message": "Download started in background", "task_id": task_id}
+
+@app.get("/status/{task_id}")
+def get_status(task_id: str):
+    task = tasks.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return task
 
 if __name__ == "__main__":
     logger = logging.getLogger("uvicorn")

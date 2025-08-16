@@ -1,4 +1,5 @@
 import subprocess
+import os
 
 def run_command(command):
     """Execute a command on the system"""
@@ -9,6 +10,8 @@ def run_command(command):
         exit(1)
 
 def main():
+    local_appdata = os.environ["LOCALAPPDATA"]
+
     print("Compiling API...")
     run_command("python setup_api.py build")
     
@@ -16,7 +19,8 @@ def main():
     run_command("python setup_ext.py")
     
     print("Creating installer...")
-    run_command('"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" setup_installer.iss')
+    inno_path = os.path.join(local_appdata, r"Programs\Inno Setup 6\ISCC.exe")
+    run_command(f'"{inno_path}" setup_installer.iss')
     
     print("Construction process completed.")
 

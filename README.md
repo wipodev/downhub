@@ -1,140 +1,180 @@
-# DownTube
+# DownHub
 
-DownTube is a project that combines a Python backend and a Chrome extension to download YouTube videos directly from their webpage. This repository provides the necessary tools to use the extension or develop custom modifications.
+DownHub is an application that bundles a **Python FastAPI backend**, a **local Tkinter GUI**, and a **Chrome extension** to download videos seamlessly from multiple platforms.
+
+Initially created for **YouTube**, it now supports **Kick**, and since it uses `yt-dlp`, you can also download from most other video sites by pasting the URL into the GUI.
 
 ---
 
-## Repository Structure
+## Table of Contents
 
-```plaintext
+- [Overview](#overview)
+- [Features](#features)
+- [How It Works](#how-it-works)
+- [Architecture](#architecture)
+- [Project Structure](#project-structure)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Building](#building)
+- [License](#license)
+- [Disclaimer](#disclaimer)
+
+---
+
+## Overview
+
+DownHub runs a **local background service (DownHubService.exe)** that listens for download requests. A **GUI client** allows pasting any video URL, and a **Chrome extension** injects a download button into YouTube and Kick video players.
+
+All downloaded files are automatically saved to the user’s **Downloads** folder, with audio and video streams merged via **FFmpeg**.
+
+---
+
+## Features
+
+- One‑click download directly from **YouTube** and **Kick** players.
+- GUI to paste and download from any `yt-dlp` supported site.
+- Background FastAPI service exposing `/download` and `/status` endpoints.
+- Task management with progress and error reporting.
+- GUI with clipboard paste and real‑time logs.
+- Chrome extension with custom button injection and toast notifications.
+- Bundled **FFmpeg/ffprobe** executables for processing.
+- Windows installer built with **Inno Setup**.
+
+---
+
+## How It Works
+
+1. **Chrome extension** injects a Download button into the video player (YouTube/Kick).
+2. Clicking the button sends the video URL to the local FastAPI backend.
+3. Backend spawns a `yt-dlp` job that downloads video+audio and merges them to MP4.
+4. Progress and status updates are exposed at `/status/<task_id>`.
+5. GUI can trigger the same `/download` endpoint by pasting URLs manually.
+6. Once finished, the file is placed in the user’s **Downloads** directory.
+
+---
+
+## Architecture
+
+- **Backend (**``**)**: FastAPI + `yt-dlp` job manager with task tracking.
+- **GUI (**``**)**: Tkinter app for pasting URLs and viewing logs.
+- **Extension (**``**)**: Manifest v3 extension that injects buttons and sends requests to backend.
+- **Build system**: `setup_api.py` (cx_Freeze) compiles backend/GUI, `setup_installer.iss` builds Windows installer.
+
+---
+
+## Project Structure
+
+```
 └── downtube
-    └── api                   # Backend to handle downloads
-        └── __init__.py
-        └── main.py           # FastAPI server for download requests
-    └── extension             # Chrome extension code
-        └── icons
-        └── background.js     # Background event logic
-        └── content.js        # Logic for interacting with YouTube
-        └── manifest.json     # Extension configuration
-        └── style.css         # User interface styling
-    └── .gitignore
-    └── build.py              # Script to compile the API and create the installer
-    └── README.md
-    └── requirements.txt
-    └── setup_api.py          # Configuration to compile the backend into an executable
-    └── setup_ext.py          # Configuration to compile the backend into an executable
-    └── setup_installer.iss   # Inno Setup script for creating a Windows installer
-    └── structure.md
+    └── api
+        └── main.py        # FastAPI backend service
+        └── gui.py         # Tkinter GUI
+        └── bin/           # ffmpeg + ffprobe executables
+    └── extension
+        └── content.js     # Injects buttons into players
+        └── background.js  # Forwards requests to backend
+        └── manifest.json  # Chrome extension manifest (MV3)
+        └── toast.css      # Notification styles
+    └── assets             # Icons
+    └── build.py           # Build pipeline
+    └── run_all.py         # Runs backend + GUI for dev
+    └── setup_api.py       # cx_Freeze build config
+    └── setup_installer.iss# Inno Setup installer script
 ```
 
 ---
 
 ## Requirements
 
-### API
+### API / GUI
 
 - Python 3.9+
-- Python dependencies (installable via pip):
-  - `fastapi`
-  - `yt-dlp`
-  - `uvicorn`
-  - `pydantic`
-- Windows operating system (for the installer)
-- ffmpeg.exe (add it to the `api/bin` folder)
-- ffprobe.exe (add it to the `api/bin` folder)
+- Dependencies: `fastapi`, `yt-dlp`, `uvicorn`, `pydantic`, `tkinter`, `requests`
+- Windows OS (installer provided)
+- `ffmpeg.exe` and `ffprobe.exe` (bundled in `api/bin`)
 
 ### Chrome Extension
 
-- Google Chrome browser
+- **Google Chrome** (Manifest v3 support)
 
 ---
 
 ## Installation
 
-### Step 1: Install the Backend
+### Step 1 — Backend + GUI
 
-1. Clone this repository:
+1. Clone repository:
 
    ```bash
-   git clone https://github.com/wipodev/downtube.git
-   cd downtube
+   git clone https://github.com/wipodev/downhub.git
+   cd downhub
    ```
 
-2. Install the required dependencies:
+2. Install dependencies:
 
    ```bash
    pip install -r requirements.txt
    ```
 
-3. Optional: Build an executable with `setup_api.py`:
-
-   ```bash
-   python setup_api.py build
-   ```
-
-4. Run the backend:
+3. Start the backend:
 
    ```bash
    python api/main.py
    ```
 
-The server will run on `http://127.0.0.1:8000`.
+   Runs at `http://127.0.0.1:8000`.
 
----
+4. Optionally start the GUI:
 
-### Step 2: Set Up the Chrome Extension
+   ```bash
+   python api/gui.py
+   ```
 
-1. Open Google Chrome and go to `chrome://extensions`.
-2. Enable Developer Mode.
-3. Click on "Load unpacked extension".
-4. Select the `extension` folder within the cloned repository.
+### Step 2 — Chrome Extension
 
-Once installed, the extension will be active on YouTube pages.
+1. Open Chrome → `chrome://extensions`
+2. Enable **Developer mode**
+3. Click **Load unpacked**
+4. Select `extension/` folder
 
 ---
 
 ## Usage
 
-1. Open any video on YouTube.
-2. You will see a new button with the extension icon in the video control menu.
-3. Click the button to start the download.
-4. The video will be saved to your system's downloads folder.
+### From Chrome Extension
 
----
+- Open a YouTube or Kick video.
+- A **Download button** appears.
+- Click to start; video saves to **Downloads** folder.
 
-## Development and Customization
+### From GUI
 
-### API
-
-The `api/main.py` file defines the backend handling download requests. You can customize the `yt-dlp` options in the `ydl_opts` variable.
-
-### Extension
-
-- **background.js**: Handles global events, such as tab URL changes.
-- **content.js**: Defines the page interaction logic on YouTube. Modify the `injectDownloadButton` function to customize the download button.
-- **style.css**: Adjust the styling of the notifications.
+- Run **DownHubGUI.exe** (or `python api/gui.py`).
+- Paste any supported URL.
+- Click **Download** → file saved in **Downloads**.
 
 ---
 
 ## Building
 
-### Create a Windows Installer
+### Windows Installer
 
-1. Ensure Inno Setup is installed.
-2. Run the `build.py` script:
+1. Install [Inno Setup](https://jrsoftware.org/isinfo.php)
+2. Run build script:
    ```bash
    python build.py
    ```
-3. The installer will be generated in the `Output` folder.
+3. Installer will appear in `Output/`.
 
 ---
 
 ## License
 
-This project is distributed under the MIT license.
+This project is licensed under the **MIT License**.
+
+---
 
 ## Disclaimer
 
-This project is not affiliated, endorsed, or associated with YouTube or Google in any way. It is provided solely for educational and learning purposes. Misuse of this tool to download content without authorization may violate YouTube's terms of service. The author is not responsible for any use of this software.
-
-If you choose to use this project, ensure that you comply with all copyright laws and YouTube's terms of service.
+This project is **not affiliated with YouTube, Kick, or Google**. It is intended for educational purposes only. Downloading copyrighted content without authorization may violate terms of service. The author assumes no responsibility for misuse.

@@ -31,7 +31,8 @@
         "https://kick.com/*"
       ],
       "js": ["content.js"],
-      "css": ["style.css"]
+      "css": ["toast.css"],
+      "run_at": "document_idle"
     }
   ]
 }
