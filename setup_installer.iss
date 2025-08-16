@@ -36,8 +36,8 @@ Filename: "taskkill"; Parameters: "/F /IM DownHubService.exe"; Flags: runhidden;
 Filename: "{app}\DownHubService.exe"; Description: "Run DownHubService"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
-; Finalizar DownHubService si está en ejecución antes de desinstalar
-Filename: "taskkill"; Parameters: "/F /IM DownHubService.exe"; Flags: runhidden
+; Durante desinstalación: cerrar el servicio antes de borrar archivos
+Filename: "taskkill"; Parameters: "/F /IM DownHubService.exe"; Flags: runhidden; RunOnceId: "KillDownHubService"
 
 [Code]
 procedure extensionInstall();
