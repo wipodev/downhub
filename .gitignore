@@ -1,11 +1,12 @@
 venv/
+.venv
 __pycache__/
 *.crx
 *.pem
+keys/
 build/
 dist/
 *.spec
 Output/
-repomix*
 ffmpeg.exe
 ffprobe.exe

@@ -1,30 +1,44 @@
 [Setup]
-AppName=DownloadService
+AppName=DownHubService
 AppVersion=0.0.3
-DefaultDirName={autopf}\DownloadService
-DefaultGroupName=DownloadService
-OutputDir=Output
-OutputBaseFilename=DownloadServiceInstaller
+DefaultDirName={autopf}\DownHubService
+DefaultGroupName=DownHubService
+OutputDir=dist
+OutputBaseFilename=DownHubServiceInstaller
 Compression=lzma
 SolidCompression=yes
-UninstallDisplayIcon={app}\icon.ico
+UninstallDisplayIcon={app}\DownHubGUI.exe
+SetupIconFile=assets\icon_installer.ico
 
 [Languages]
 Name: "en"; MessagesFile: "compiler:Default.isl"
 Name: "es"; MessagesFile: "compiler:Languages\Spanish.isl"
 
 [Files]
+; Copia todos los archivos de la compilación cx_Freeze
 Source: "build\exe.win-amd64-3.11\*"; DestDir: "{app}"; Flags: onlyifdoesntexist recursesubdirs createallsubdirs
-Source: "build\exe.win-amd64-3.11\DownloadService.exe"; DestDir: "{app}"; Flags: ignoreversion
+; API
+Source: "build\exe.win-amd64-3.11\DownHubService.exe"; DestDir: "{app}"; Flags: ignoreversion
+; GUI
+Source: "build\exe.win-amd64-3.11\DownHubGUI.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "extension\*"; DestDir: "{app}\extension"; Flags: comparetimestamp recursesubdirs createallsubdirs
 Source: "README.md"; DestDir: "{app}"; Flags: ignoreversion; AfterInstall: extensionInstall
-Source: "assets\icon.ico"; DestDir: "{app}"; Flags: onlyifdestfileexists
 
 [Icons]
-Name: "{commonstartup}\DownloadService"; Filename: "{app}\DownloadService.exe"; WorkingDir: "{app}"
+; Servicio API en carpeta de inicio
+Name: "{commonstartup}\DownHubService"; Filename: "{app}\DownHubService.exe"; WorkingDir: "{app}"
+; GUI en escritorio
+Name: "{commondesktop}\DownHubGUI"; Filename: "{app}\DownHubGUI.exe"; WorkingDir: "{app}"
 
 [Run]
-Filename: "{app}\DownloadService.exe"; Description: "Run DownloadService"; Flags: nowait postinstall skipifsilent
+; 1. Durante instalación: detener cualquier DownHubService previo antes de copiar archivos
+Filename: "taskkill"; Parameters: "/F /IM DownHubService.exe"; Flags: runhidden; StatusMsg: "Finalizando DownHubService en ejecución..."
+; 2. Después de instalar, lanzar el servicio
+Filename: "{app}\DownHubService.exe"; Description: "Run DownHubService"; Flags: nowait postinstall skipifsilent
+
+[UninstallRun]
+; Durante desinstalación: cerrar el servicio antes de borrar archivos
+Filename: "taskkill"; Parameters: "/F /IM DownHubService.exe"; Flags: runhidden; RunOnceId: "KillDownHubService"
 
 [Code]
 procedure extensionInstall();
