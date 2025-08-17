@@ -6,6 +6,7 @@ build_options = {
     "include_files": [
         ("api/bin/ffmpeg.exe", "bin/ffmpeg.exe"),
         ("api/bin/ffprobe.exe", "bin/ffprobe.exe"),
+        ("assets/favicon.ico", "lib/assets/favicon.ico"),
     ],
 }
 
