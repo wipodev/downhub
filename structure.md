@@ -20,7 +20,15 @@
         └── background.js
         └── content.js
         └── manifest.json
-        └── toast.css
+        └── core
+            └── downloader.js
+            └── siteRegistry.js
+        └── utils
+            └── dom.js
+            └── messaging.js
+            └── notifications.js
+        └── styles
+            └── toast.css
     └── .gitignore
     └── build.py
     └── README.md

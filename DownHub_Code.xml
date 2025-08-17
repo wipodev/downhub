@@ -45,8 +45,14 @@ api/main.py
 build.py
 extension/background.js
 extension/content.js
+extension/core/downloader.js
+extension/core/siteRegistry.js
 extension/manifest.json
-extension/toast.css
+extension/styles/toast.css
+extension/utils/dom.js
+extension/utils/messaging.js
+extension/utils/notifications.js
+make_icons.bat
 run_all.py
 setup_api.py
 setup_installer.iss
@@ -54,6 +60,378 @@ setup_installer.iss
 
 <files>
 This section contains the contents of the repository's files.
+
+<file path="extension/core/downloader.js">
+const activePolls = new Map();
+
+/**
+ * Crea un botón con lógica de descarga ya lista.
+ */
+function createIconButton({ id, title = "Download" }) {
+  const btn = document.createElement("button");
+  btn.id = id;
+  btn.title = title;
+  btn.classList.add("ytp-button");
+
+  if (title === "Download VOD") {
+    Object.assign(btn.style, {
+      padding: "5px",
+      width: "44px",
+      height: "44px",
+      cursor: "pointer",
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      opacity: "0.95",
+    });
+  }
+
+  btn.addEventListener("mouseenter", () => (btn.style.opacity = "1"));
+  btn.addEventListener("mouseleave", () => (btn.style.opacity = "0.95"));
+
+  btn.innerHTML = `
+<svg version="1.1" width="100%" height="100%" viewBox="0 0 36 36" aria-hidden="true" focusable="false">
+  <path d="m9.2 20.447c-0.6648 0-1.2 0.54774-1.2 1.2281v5.5437c0 0.0048 6.52e-4 0.0094 7.04e-4 0.01422-4e-5 0.0047-7.04e-4 0.0092-7.04e-4 0.0139 0 0.6648 0.5352 1.2 1.2 1.2h17.6c0.6648 0 1.2-0.5352 1.2-1.2 0-0.0047-6.48e-4 -0.0092-7.04e-4 -0.0139 4e-5 -0.0048 7.04e-4 -0.0094 7.04e-4 -0.01422v-5.5437c0-0.68039-0.5352-1.2281-1.2-1.2281s-1.2 0.54774-1.2 1.2281v4.3719h-15.2v-4.3719c0-0.68039-0.5352-1.2281-1.2-1.2281zm8.7989-12.895c-0.6648 0-1.2 0.5352-1.2 1.2v10.701l-3.3244-3.3244c-0.47008-0.47008-1.2269-0.47008-1.697 0-0.47008 0.47009-0.47008 1.2269 0 1.697l5.3346 5.3346c0.17055 0.18717 0.399 0.32012 0.65844 0.36976 0.0026 4.8e-4 0.0052 6.8e-4 0.0077 0.0012 0.03437 0.0063 0.06903 0.01178 0.10438 0.01516 0.03184 0.0031 0.06375 0.0043 0.0957 0.0048 0.0069 0 0.01361 1e-3 0.02055 1e-3h5.44e-4c0.03976 1.6e-5 0.07954-0.0021 0.11914-6e-3 0.01766-0.0017 0.03477-0.0051 0.05219-0.0076 0.02077-3e-3 0.04157-0.0054 0.06219-0.0095 0.02671-0.0052 0.05272-0.01224 0.07875-0.01922 0.01096-3e-3 0.02207-0.0052 0.03297-0.0084 0.03293-0.0098 0.06498-0.02148 0.09664-0.03398 0.0037-0.0015 0.0075-0.0026 0.01117-0.0041 0.15661-0.06367 0.29616-0.15942 0.41133-0.27914l5.3588-5.3587c0.47008-0.47008 0.47008-1.2269 0-1.697-0.47009-0.47008-1.227-0.47008-1.6971 0l-3.3266 3.3266v-10.703c0-0.6648-0.5352-1.2-1.2-1.2z" fill="#fff"/>
+</svg>`;
+
+  // Click handler with proxy & sticky progress
+  btn.addEventListener("click", async () => {
+    const prev = btn.innerHTML;
+    btn.disabled = true;
+
+    showNotification("Starting download...", "info", 1200);
+
+    try {
+      const res = await sendToBackend(location.href);
+      if (!res?.ok) {
+        btn.style.filter = "drop-shadow(0 0 6px rgba(255,0,0,.6))";
+        showNotification("❌ Backend not reachable", "error", 3200);
+        return;
+      }
+
+      const taskId = res?.data?.task_id;
+      if (!taskId) {
+        console.warn("[DownHub] No task_id in response:", res);
+        showNotification("⚠️ Waiting for task id…", "info", 2000);
+        return;
+      }
+
+      btn.style.filter = "drop-shadow(0 0 6px rgba(0,255,0,.6))";
+      const sticky = showSticky("⬇️ Downloading…", "info");
+
+      // Avoid duplicate polls per task
+      if (activePolls.has(taskId)) {
+        clearInterval(activePolls.get(taskId));
+        activePolls.delete(taskId);
+      }
+
+      const interval = setInterval(async () => {
+        try {
+          const statusRes = await getTaskStatus(taskId);
+          if (!statusRes.ok) {
+            console.error("Status check error:", statusRes.error || statusRes.status);
+            sticky.update("⚠️ Lost connection while checking status", "error");
+            clearInterval(interval);
+            activePolls.delete(taskId);
+            setTimeout(() => sticky.close(), 2500);
+            return;
+          }
+
+          const statusData = statusRes.data;
+          if (statusData.status === "completed") {
+            sticky.update("✅ Download completed!", "success");
+            clearInterval(interval);
+            activePolls.delete(taskId);
+            setTimeout(() => sticky.close(), 1800);
+          } else if (statusData.status === "error") {
+            sticky.update(`❌ Error: ${statusData.error_msg || "unknown"}`, "error");
+            clearInterval(interval);
+            activePolls.delete(taskId);
+            setTimeout(() => sticky.close(), 2500);
+          } else {
+            // Keep-alive animation
+            const dots = ["", ".", "..", "..."];
+            const i = Math.floor(Date.now() / 800) % dots.length;
+            sticky.update(`⬇️ Downloading${dots[i]}`, "info");
+          }
+        } catch (err) {
+          console.error("Status check error:", err);
+          sticky.update("⚠️ Lost connection while checking status", "error");
+          clearInterval(interval);
+          activePolls.delete(taskId);
+          setTimeout(() => sticky.close(), 2500);
+        }
+      }, 2000);
+
+      activePolls.set(taskId, interval);
+    } catch (e) {
+      console.error(e);
+      showNotification("An error occurred!", "error", 3200);
+    } finally {
+      setTimeout(() => (btn.style.filter = ""), 800);
+      btn.innerHTML = prev;
+      btn.disabled = false;
+    }
+  });
+
+  return btn;
+}
+
+/**
+ * Inyecta el botón en un contenedor según configuración de sitio.
+ */
+async function injectButton({ selector, id, title }) {
+  try {
+    const container = await waitForElement(selector, 25000);
+    if (!container || alreadyInjected(container, id)) return;
+    const btn = createIconButton({ id, title });
+    container.insertBefore(btn, container.firstChild);
+  } catch (err) {
+    console.warn("[DownHub] injectButton error:", err.message);
+  }
+}
+</file>
+
+<file path="extension/core/siteRegistry.js">
+// Cada sitio declara sus reglas aquí
+const sites = [
+  {
+    name: "YouTube",
+    match: () => location.hostname.includes("youtube.com") && /\/watch/.test(location.pathname),
+    selector: "#movie_player > div.ytp-chrome-bottom > div.ytp-chrome-controls > div.ytp-right-controls",
+    id: "dl-icon-btn-yt",
+    title: "Download",
+  },
+  {
+    name: "Kick",
+    match: () => location.hostname.includes("kick.com") && /^\/[^/]+\/videos?\//.test(location.pathname),
+    selector: "#injected-embedded-channel-player-video > div > div > div:nth-child(2)",
+    id: "dl-icon-btn-kick",
+    title: "Download VOD",
+  },
+];
+
+// Función para iterar y disparar inyecciones
+function injectForActiveSites() {
+  for (const site of sites) {
+    if (site.match()) {
+      injectButton(site);
+    }
+  }
+}
+</file>
+
+<file path="extension/styles/toast.css">
+#dl-notification-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 999999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#dl-notification-container .dl-toast {
+  padding: 10px 14px;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 14px;
+  font-family: sans-serif;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  transform: translateY(-10px);
+  animation: toastSlideIn 0.3s ease forwards;
+}
+
+#dl-notification-container .dl-toast.success {
+  background: rgba(0, 150, 0, 0.85);
+}
+
+#dl-notification-container .dl-toast.error {
+  background: rgba(200, 0, 0, 0.85);
+}
+
+#dl-notification-container .dl-toast.info {
+  background: rgba(0, 0, 0, 0.75);
+}
+
+@keyframes toastSlideIn {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes toastSlideOut {
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+</file>
+
+<file path="extension/utils/dom.js">
+function debounce(fn, ms = 100) {
+  let t;
+  return (...args) => {
+    clearTimeout(t);
+    t = setTimeout(() => fn(...args), ms);
+  };
+}
+
+function alreadyInjected(container, id) {
+  return container && container.querySelector(`#${id}`);
+}
+
+function waitForElement(selector, timeoutMs = 20000) {
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector(selector);
+    if (existing) {
+      return resolve(existing);
+    }
+
+    const obs = new MutationObserver(() => {
+      const el = document.querySelector(selector);
+      if (el) {
+        obs.disconnect();
+        resolve(el);
+      }
+    });
+    obs.observe(document.documentElement, { childList: true, subtree: true });
+
+    setTimeout(() => {
+      obs.disconnect();
+      const el = document.querySelector(selector);
+      if (el) {
+        resolve(el);
+      } else {
+        reject(new Error("Timeout waiting for: " + selector));
+      }
+    }, timeoutMs);
+  });
+}
+</file>
+
+<file path="extension/utils/messaging.js">
+const API_MESSAGE = "DOWNLOAD_URL";
+const STATUS_MESSAGE = "STATUS_TASK";
+
+function sendToBackend(url) {
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage({ type: API_MESSAGE, url }, (res) => {
+      const err = chrome.runtime.lastError;
+      if (err) {
+        resolve({ ok: false, error: err.message });
+        return;
+      }
+      resolve(res);
+    });
+  });
+}
+
+function getTaskStatus(taskId) {
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage({ type: STATUS_MESSAGE, taskId }, (res) => {
+      const err = chrome.runtime.lastError;
+      if (err) {
+        resolve({ ok: false, error: err.message });
+        return;
+      }
+      resolve(res);
+    });
+  });
+}
+</file>
+
+<file path="extension/utils/notifications.js">
+// --- Notification container setup ---
+let notificationContainer = document.getElementById("dl-notification-container");
+if (!notificationContainer) {
+  notificationContainer = document.createElement("div");
+  notificationContainer.id = "dl-notification-container";
+  document.body.appendChild(notificationContainer);
+}
+
+function showNotification(message, type, duration = 2000) {
+  const notification = document.createElement("div");
+  notification.className = `dl-toast ${type}`;
+  notification.textContent = message;
+  notificationContainer.appendChild(notification);
+
+  setTimeout(() => {
+    notification.style.animation = "toastSlideOut 0.3s ease forwards";
+    setTimeout(() => notification.remove(), 300);
+  }, duration);
+}
+
+/** Sticky toast (no se cierra solo). Devuelve handlers para update/close. */
+function showSticky(message, type = "info") {
+  const el = document.createElement("div");
+  el.className = `dl-toast ${type}`;
+  el.textContent = message;
+  notificationContainer.appendChild(el);
+
+  return {
+    update(newMessage, newType) {
+      if (typeof newMessage === "string") el.textContent = newMessage;
+      if (newType) {
+        el.classList.remove("info", "success", "error");
+        el.classList.add(newType);
+      }
+    },
+    close() {
+      el.style.animation = "toastSlideOut 0.3s ease forwards";
+      setTimeout(() => el.remove(), 300);
+    },
+  };
+}
+</file>
+
+<file path="make_icons.bat">
+@echo off
+setlocal enabledelayedexpansion
+set ASSETS=assets
+
+REM Lista de subcarpetas que contienen los PNG
+for %%D in (icon_gui icon_service icon_installer favicon) do (
+    echo === Procesando %%D ===
+    set FILES=
+    for %%S in (16 32 48 128 256) do (
+        set FILES=!FILES! "%ASSETS%\%%D\%%D-%%S.png"
+    )
+
+    REM Generar el .ico en assets/
+    magick !FILES! "%ASSETS%\%%D.ico"
+    if exist "%ASSETS%\%%D.ico" (
+        echo Generado: %ASSETS%\%%D.ico
+    ) else (
+        echo Error generando %ASSETS%\%%D.ico
+    )
+)
+
+echo.
+echo 🚀 Conversión completada.
+pause
+</file>
+
+<file path="run_all.py">
+import subprocess
+import sys
+import os
+import time
+
+api_path = os.path.join("api", "main.py")
+api_process = subprocess.Popen([sys.executable, api_path])
+time.sleep(2)
+
+try:
+    import api.gui
+except Exception as e:
+    print(f"Error ejecutando la GUI: {e}")
+finally:
+    api_process.terminate()
+</file>
 
 <file path="api/gui.py">
 import tkinter as tk
@@ -130,7 +508,7 @@ root.geometry("500x300")
 root.resizable(False, False)
 
 # Set icon
-icon_path = os.path.join(os.path.dirname(__file__), "..", "assets", "icon2.ico")
+icon_path = os.path.join(os.path.dirname(__file__), "..", "assets", "favicon.ico")
 if os.path.exists(icon_path):
     root.iconbitmap(icon_path)
 
@@ -174,74 +552,6 @@ tk.Label(
 root.mainloop()
 </file>
 
-<file path="extension/toast.css">
-#dl-notification-container {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  z-index: 999999;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-#dl-notification-container .dl-toast {
-  padding: 10px 14px;
-  border-radius: 6px;
-  color: #fff;
-  font-size: 14px;
-  font-family: sans-serif;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-  opacity: 0;
-  transform: translateY(-10px);
-  animation: toastSlideIn 0.3s ease forwards;
-}
-
-#dl-notification-container .dl-toast.success {
-  background: rgba(0, 150, 0, 0.85);
-}
-
-#dl-notification-container .dl-toast.error {
-  background: rgba(200, 0, 0, 0.85);
-}
-
-#dl-notification-container .dl-toast.info {
-  background: rgba(0, 0, 0, 0.75);
-}
-
-@keyframes toastSlideIn {
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes toastSlideOut {
-  to {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-}
-</file>
-
-<file path="run_all.py">
-import subprocess
-import sys
-import os
-import time
-
-api_path = os.path.join("api", "main.py")
-api_process = subprocess.Popen([sys.executable, api_path])
-time.sleep(2)
-
-try:
-    import api.gui
-except Exception as e:
-    print(f"Error ejecutando la GUI: {e}")
-finally:
-    api_process.terminate()
-</file>
-
 <file path="build.py">
 import subprocess
 import os
@@ -257,11 +567,11 @@ def run_command(command):
 def main():
     local_appdata = os.environ["LOCALAPPDATA"]
 
+    print("Generating extension key and updating files...")
+    run_command("python setup_ext.py")
+
     print("Compiling API...")
     run_command("python setup_api.py build")
-    
-    print("Packaging extension...")
-    run_command("python setup_ext.py")
     
     print("Creating installer...")
     inno_path = os.path.join(local_appdata, r"Programs\Inno Setup 6\ISCC.exe")
@@ -275,242 +585,55 @@ if __name__ == "__main__":
 
 <file path="extension/background.js">
 // background.js
+const API_BASE = "http://127.0.0.1:8000";
 
-// Relay requests to the local API (FastAPI) to avoid CORS surprises and keep logic centralized.
-chrome.runtime.onMessage.addListener(async (msg, _sender, sendResponse) => {
-  if (msg?.type === "DOWNLOAD_URL" && typeof msg.url === "string") {
-    try {
-      const res = await fetch("http://127.0.0.1:8000/download", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: msg.url }),
-      });
-
-      let data = null;
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg?.type === "DOWNLOAD_URL") {
+    (async () => {
       try {
-        data = await res.json();
-      } catch {
-        data = { message: "No JSON body" };
+        const r = await fetch(`${API_BASE}/download`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: msg.url }),
+        });
+        const data = await r.json().catch(() => ({}));
+        sendResponse({ ok: r.ok, data, status: r.status });
+      } catch (e) {
+        sendResponse({ ok: false, error: String(e) });
       }
+    })();
+    return true;
+  }
 
-      sendResponse({ ok: res.ok, status: res.status, data });
-    } catch (err) {
-      sendResponse({ ok: false, status: 0, error: String(err) });
-    }
-    // Keep the message channel open for the async response
+  if (msg?.type === "STATUS_TASK" && msg?.taskId) {
+    (async () => {
+      try {
+        const r = await fetch(`${API_BASE}/status/${msg.taskId}`);
+        const data = await r.json().catch(() => ({}));
+        sendResponse({ ok: r.ok, data, status: r.status });
+      } catch (e) {
+        sendResponse({ ok: false, error: String(e) });
+      }
+    })();
     return true;
   }
 });
 </file>
 
 <file path="extension/content.js">
-// content.js
-
-// --- Config -----------------------------------------------------------------
-const API_MESSAGE = "DOWNLOAD_URL";
-
-// Selectors you provided
-const YT_CONTAINER_SELECTOR =
-  "#movie_player > div.ytp-chrome-bottom > div.ytp-chrome-controls > div.ytp-right-controls";
-
-const KICK_CONTAINER_SELECTOR = "#injected-embedded-channel-player-video > div > div > div:nth-child(2)";
-
-// Unique IDs to avoid double injections
-const BTN_ID_YT = "dl-icon-btn-yt";
-const BTN_ID_KICK = "dl-icon-btn-kick";
-
-// --- Notification container setup -------------------------------------------
-let notificationContainer = document.getElementById("dl-notification-container");
-if (!notificationContainer) {
-  notificationContainer = document.createElement("div");
-  notificationContainer.id = "dl-notification-container";
-  document.body.appendChild(notificationContainer);
-}
-
-function showNotification(message, type, duration = 2000) {
-  const notification = document.createElement("div");
-  notification.className = `dl-toast ${type}`;
-  notification.textContent = message;
-
-  notificationContainer.appendChild(notification);
-
-  setTimeout(() => {
-    notification.style.animation = "toastSlideOut 0.3s ease forwards";
-    setTimeout(() => {
-      if (notification.parentNode) {
-        notificationContainer.removeChild(notification);
-      }
-    }, 300);
-  }, duration);
-}
-
-// --- Site detection ----------------------------------------------------------
-function isYouTubeWatch() {
-  return location.hostname.includes("youtube.com") && /\/watch/.test(location.pathname);
-}
-
-function isKickVod() {
-  return location.hostname.includes("kick.com") && /^\/[^/]+\/videos?\//.test(location.pathname);
-}
-
-// --- Utilities ---------------------------------------------------------------
-function debounce(fn, ms = 100) {
-  let t;
-  return (...args) => {
-    clearTimeout(t);
-    t = setTimeout(() => fn(...args), ms);
-  };
-}
-
-function sendToBackend(url) {
-  return new Promise((resolve) => {
-    chrome.runtime.sendMessage({ type: API_MESSAGE, url }, (res) => resolve(res));
-  });
-}
-
-function createIconButton({ id, title = "Download" }) {
-  const btn = document.createElement("button");
-  btn.id = id;
-  btn.title = title;
-  btn.classList.add("ytp-button");
-
-  if (title === "Download VOD") {
-    Object.assign(btn.style, {
-      padding: "5px",
-      width: "44px",
-      height: "44px",
-      cursor: "pointer",
-      display: "inline-flex",
-      alignItems: "center",
-      justifyContent: "center",
-      opacity: "0.95",
-    });
-  }
-
-  btn.addEventListener("mouseenter", () => (btn.style.opacity = "1"));
-  btn.addEventListener("mouseleave", () => (btn.style.opacity = "0.95"));
-
-  btn.innerHTML = `
-    <svg version="1.1" width="100%" height="100%" viewBox="0 0 36 36">
- <path d="m9.2 20.447c-0.6648 0-1.2 0.54774-1.2 1.2281v5.5437c0 0.0048 6.52e-4 0.0094 7.04e-4 0.01422-4e-5 0.0047-7.04e-4 0.0092-7.04e-4 0.0139 0 0.6648 0.5352 1.2 1.2 1.2h17.6c0.6648 0 1.2-0.5352 1.2-1.2 0-0.0047-6.48e-4 -0.0092-7.04e-4 -0.0139 4e-5 -0.0048 7.04e-4 -0.0094 7.04e-4 -0.01422v-5.5437c0-0.68039-0.5352-1.2281-1.2-1.2281s-1.2 0.54774-1.2 1.2281v4.3719h-15.2v-4.3719c0-0.68039-0.5352-1.2281-1.2-1.2281zm8.7989-12.895c-0.6648 0-1.2 0.5352-1.2 1.2v10.701l-3.3244-3.3244c-0.47008-0.47008-1.2269-0.47008-1.697 0-0.47008 0.47009-0.47008 1.2269 0 1.697l5.3346 5.3346c0.17055 0.18717 0.399 0.32012 0.65844 0.36976 0.0026 4.8e-4 0.0052 6.8e-4 0.0077 0.0012 0.03437 0.0063 0.06903 0.01178 0.10438 0.01516 0.03184 0.0031 0.06375 0.0043 0.0957 0.0048 0.0069 0 0.01361 1e-3 0.02055 1e-3h5.44e-4c0.03976 1.6e-5 0.07954-0.0021 0.11914-6e-3 0.01766-0.0017 0.03477-0.0051 0.05219-0.0076 0.02077-3e-3 0.04157-0.0054 0.06219-0.0095 0.02671-0.0052 0.05272-0.01224 0.07875-0.01922 0.01096-3e-3 0.02207-0.0052 0.03297-0.0084 0.03293-0.0098 0.06498-0.02148 0.09664-0.03398 0.0037-0.0015 0.0075-0.0026 0.01117-0.0041 0.15661-0.06367 0.29616-0.15942 0.41133-0.27914l5.3588-5.3587c0.47008-0.47008 0.47008-1.2269 0-1.697-0.47009-0.47008-1.227-0.47008-1.6971 0l-3.3266 3.3266v-10.703c0-0.6648-0.5352-1.2-1.2-1.2z" fill="#fff"/>
-</svg>
-  `;
-
-  btn.addEventListener("click", async () => {
-    const prev = btn.innerHTML;
-    btn.disabled = true;
-
-    showNotification("Starting download...", "info", 3000);
-
-    try {
-      const res = await sendToBackend(location.href);
-
-      if (res?.ok && res?.data?.task_id) {
-        const taskId = res.data.task_id;
-        btn.style.filter = "drop-shadow(0 0 6px rgba(0,255,0,.6))";
-        showNotification("Download started in background", "success", 3000);
-
-        // 🔄 Polling
-        const interval = setInterval(async () => {
-          try {
-            const statusRes = await fetch(`http://127.0.0.1:8000/status/${taskId}`);
-            const statusData = await statusRes.json();
-
-            if (statusData.status === "completed") {
-              showNotification("✅ Download completed!", "success", 4000);
-              clearInterval(interval);
-            } else if (statusData.status === "error") {
-              showNotification(`❌ Error: ${statusData.error_msg}`, "error", 4000);
-              clearInterval(interval);
-            }
-          } catch (err) {
-            console.error("Status check error:", err);
-            clearInterval(interval);
-          }
-        }, 4000);
-      } else {
-        btn.style.filter = "drop-shadow(0 0 6px rgba(255,0,0,.6))";
-        showNotification("Download failed!", "error", 4000);
-      }
-
-      setTimeout(() => (btn.style.filter = ""), 800);
-    } catch (e) {
-      console.error(e);
-      showNotification("An error occurred!", "error", 4000);
-    } finally {
-      btn.innerHTML = prev;
-      btn.disabled = false;
-    }
-  });
-
-  return btn;
-}
-
-function alreadyInjected(container, id) {
-  return container && container.querySelector(`#${id}`);
-}
-
-function waitForElement(selector, timeoutMs = 20000) {
-  return new Promise((resolve, reject) => {
-    const existing = document.querySelector(selector);
-    if (existing) {
-      return resolve(existing);
-    }
-
-    const obs = new MutationObserver(() => {
-      const el = document.querySelector(selector);
-      if (el) {
-        obs.disconnect();
-        resolve(el);
-      }
-    });
-    obs.observe(document.documentElement, { childList: true, subtree: true });
-
-    setTimeout(() => {
-      obs.disconnect();
-      const el = document.querySelector(selector);
-      if (el) {
-        resolve(el);
-      } else {
-        reject(new Error("Timeout waiting for: " + selector));
-      }
-    }, timeoutMs);
-  });
-}
-
-// --- Injection per site ------------------------------------------------------
-async function injectYouTube() {
-  if (!isYouTubeWatch()) return;
-  try {
-    const container = await waitForElement(YT_CONTAINER_SELECTOR, 25000);
-    if (!container || alreadyInjected(container, BTN_ID_YT)) return;
-    const btn = createIconButton({ id: BTN_ID_YT, title: "Download" });
-    container.insertBefore(btn, container.firstChild);
-  } catch {}
-}
-
-async function injectKick() {
-  if (!isKickVod()) return;
-  try {
-    const container = await waitForElement(KICK_CONTAINER_SELECTOR, 25000);
-    if (!container || alreadyInjected(container, BTN_ID_KICK)) {
-      return;
-    }
-    const btn = createIconButton({ id: BTN_ID_KICK, title: "Download VOD" });
-    container.appendChild(btn);
-  } catch (err) {
-    console.error("[Downloader] injectKick() error:", err);
-  }
-}
-
-// --- Router (SPA) handling ---------------------------------------------------
 let lastUrl = location.href;
 
 const handleRouteChange = debounce(() => {
   if (lastUrl !== location.href) {
     lastUrl = location.href;
-    injectYouTube();
-    injectKick();
+
+    // On route change, stop any active polls (new page)
+    for (const [taskId, intId] of activePolls.entries()) {
+      clearInterval(intId);
+      activePolls.delete(taskId);
+    }
+
+    injectForActiveSites();
   }
 }, 80);
 
@@ -527,26 +650,34 @@ history.replaceState = function () {
 };
 
 window.addEventListener("popstate", handleRouteChange);
+window.addEventListener("beforeunload", () => {
+  for (const [, intId] of activePolls) clearInterval(intId);
+  activePolls.clear();
+});
 
 const mo = new MutationObserver(
   debounce(() => {
-    injectYouTube();
-    injectKick();
+    injectForActiveSites();
   }, 150)
 );
 mo.observe(document.documentElement, { childList: true, subtree: true });
 
 // Initial run
-injectYouTube();
-injectKick();
+injectForActiveSites();
 </file>
 
 <file path="extension/manifest.json">
 {
   "manifest_version": 3,
-  "name": "DownTube",
+  "name": "DownHub",
   "version": "0.0.3",
-  "description": "Extension to download YouTube videos using a local backend.",
+  "description": "Extension to download videos using a local backend.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAiLOBGHygOMJT+xprwOVvQVHOrcnkUUO+9RdmKOCLgdt3haMf6kyM3+2pvzd1h/ANWrBS8rMErX5Ifao5BRtWOyH5CdrkwEtOVLTKSQt4Kz1p630xTJXSAKmN7rI6VQ3L4ssxBElF9J3XDS2zazg0+03SBQSCMkCL4Q3AOr442Q2ByIy0NK/KyJphk9dL0TQufmjOj4mfhE0x3B0wcNuFkS5NOyVYVCautOcjUElAOMPSDv4s8b2/wjNha4ERrFFi4/sPPBspFJ8nOrYG4aXiNh/nDfjQbgmoEBmMdfsNXoNHbeZnD0cDYAYTA8LCRV4vKxK2LUqUdeW8Ybn890cbMQIDAQAB",
+  "icons": {
+    "16": "icons/icon-16x16.png",
+    "48": "icons/icon-48x48.png",
+    "128": "icons/icon-128x128.png"
+  },
   "permissions": ["scripting", "activeTab"],
   "host_permissions": [
     "https://www.youtube.com/*",
@@ -554,14 +685,11 @@ injectKick();
     "https://m.youtube.com/*",
     "https://www.kick.com/*",
     "https://kick.com/*",
+    "http://127.0.0.1/*",
+    "http://localhost/*",
     "http://127.0.0.1:8000/*",
     "http://localhost:8000/*"
   ],
-  "icons": {
-    "16": "icons/icon-16x16.png",
-    "48": "icons/icon-48x48.png",
-    "128": "icons/icon-128x128.png"
-  },
   "background": {
     "service_worker": "background.js"
   },
@@ -574,8 +702,15 @@ injectKick();
         "https://www.kick.com/*",
         "https://kick.com/*"
       ],
-      "js": ["content.js"],
-      "css": ["toast.css"],
+      "js": [
+        "utils/dom.js",
+        "utils/messaging.js",
+        "utils/notifications.js",
+        "core/downloader.js",
+        "core/siteRegistry.js",
+        "content.js"
+      ],
+      "css": ["styles/toast.css"],
       "run_at": "document_idle"
     }
   ]
@@ -591,6 +726,7 @@ build_options = {
     "include_files": [
         ("api/bin/ffmpeg.exe", "bin/ffmpeg.exe"),
         ("api/bin/ffprobe.exe", "bin/ffprobe.exe"),
+        ("assets/favicon.ico", "lib/assets/favicon.ico"),
     ],
 }
 
@@ -598,13 +734,13 @@ executables = [
     Executable(
         script="api/main.py",
         target_name="DownHubService.exe",
-        icon="assets/icon.ico",
+        icon="assets/icon_service.ico",
         base="win32gui",
     ),
     Executable(
         script="api/gui.py",
         target_name="DownHubGUI.exe",
-        icon="assets/icon.ico",
+        icon="assets/icon_gui.ico",
         base="win32gui",
     )
 ]
@@ -612,7 +748,7 @@ executables = [
 setup(
     name="DownHubTools",
     version="0.0.3",
-    description="YouTube/Kick video download service + GUI",
+    description="DownHub video download service",
     options={"build_exe": build_options},
     executables=executables,
 )
@@ -656,9 +792,11 @@ app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "chrome-extension://mppaemmnjblpfpiijkbmgfbkmkgjlean",
+        "chrome-extension://aoajebnokccpepbkcdinhkpclikhmink",
         "http://127.0.0.1",
-        "http://localhost"
+        "http://localhost",
+        "http://127.0.0.1:8000",
+        "http://localhost:8000",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -679,15 +817,15 @@ def download_job(task_id, url):
     ydl_opts = {
         'outtmpl': os.path.join(downloads_folder, '%(title)s.%(ext)s'),
         "restrictfilenames": True,
-        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+        'format': 'bestvideo+bestaudio/best',
         "merge_output_format": "mp4",
         "hls_prefer_native": True,
         "continuedl": True,
         "fragment_retries": 10,
         "retries": 5,
         "concurrent_fragment_downloads": 5,
-        "quiet": True,
-        "noprogress": True,
+        "quiet": False,
+        "noprogress": False,
         "no_mtime": True,
         "http_headers": {
             "User-Agent": (
@@ -751,11 +889,12 @@ AppName=DownHubService
 AppVersion=0.0.3
 DefaultDirName={autopf}\DownHubService
 DefaultGroupName=DownHubService
-OutputDir=Output
+OutputDir=dist
 OutputBaseFilename=DownHubServiceInstaller
 Compression=lzma
 SolidCompression=yes
-UninstallDisplayIcon={app}\icon.ico
+UninstallDisplayIcon={app}\DownHubGUI.exe
+SetupIconFile=assets\icon_installer.ico
 
 [Languages]
 Name: "en"; MessagesFile: "compiler:Default.isl"
@@ -770,16 +909,22 @@ Source: "build\exe.win-amd64-3.11\DownHubService.exe"; DestDir: "{app}"; Flags: 
 Source: "build\exe.win-amd64-3.11\DownHubGUI.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "extension\*"; DestDir: "{app}\extension"; Flags: comparetimestamp recursesubdirs createallsubdirs
 Source: "README.md"; DestDir: "{app}"; Flags: ignoreversion; AfterInstall: extensionInstall
-Source: "assets\icon.ico"; DestDir: "{app}"; Flags: onlyifdestfileexists
 
 [Icons]
 ; Servicio API en carpeta de inicio
 Name: "{commonstartup}\DownHubService"; Filename: "{app}\DownHubService.exe"; WorkingDir: "{app}"
 ; GUI en escritorio
-Name: "{commondesktop}\DownHubGUI"; Filename: "{app}\DownHubGUI.exe"; WorkingDir: "{app}"; IconFilename: "{app}\icon.ico"
+Name: "{commondesktop}\DownHubGUI"; Filename: "{app}\DownHubGUI.exe"; WorkingDir: "{app}"
 
 [Run]
+; 1. Durante instalación: detener cualquier DownHubService previo antes de copiar archivos
+Filename: "taskkill"; Parameters: "/F /IM DownHubService.exe"; Flags: runhidden; StatusMsg: "Finalizando DownHubService en ejecución..."
+; 2. Después de instalar, lanzar el servicio
 Filename: "{app}\DownHubService.exe"; Description: "Run DownHubService"; Flags: nowait postinstall skipifsilent
+
+[UninstallRun]
+; Durante desinstalación: cerrar el servicio antes de borrar archivos
+Filename: "taskkill"; Parameters: "/F /IM DownHubService.exe"; Flags: runhidden; RunOnceId: "KillDownHubService"
 
 [Code]
 procedure extensionInstall();
