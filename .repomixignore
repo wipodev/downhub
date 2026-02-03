@@ -1,9 +1,0 @@
-_init__.py
-structure.md
-requirements.txt
-readme.md
-setup_ext.py
-*.svg
-.gitignore
-.repomixignore
-repomix.config.json

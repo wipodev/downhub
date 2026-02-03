@@ -1,0 +1,118 @@
+/* styles/button.css */
+
+/* Clase base para nuestro botón inyectado */
+.downhub-btn {
+  position: relative;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  opacity: 0.9;
+  vertical-align: middle;
+  padding: 0;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.downhub-btn:hover {
+  opacity: 1;
+}
+
+.downhub-btn svg path {
+  fill: #ffffff;
+  transition: fill 0.3s ease;
+}
+
+/* Efecto de "Descargando" (cuando el botón está deshabilitado) */
+.downhub-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+/* --- ESTADO DE DESCARGA / CANCELACIÓN --- */
+
+/* Cuando está descargando, aplicamos el estilo de "alerta" */
+.downhub-btn.is-downloading {
+  animation: downhub-pulse 2s infinite;
+}
+
+.downhub-btn.is-downloading svg path {
+  fill: #ff4444; /* Rojo vibrante para indicar que el siguiente clic detiene */
+}
+
+/* Tooltip visual opcional usando el title nativo o un cambio de escala al hover */
+.downhub-btn.is-downloading:hover {
+  transform: scale(1.1);
+  filter: drop-shadow(0 0 5px rgba(255, 68, 68, 0.5));
+}
+
+@keyframes downhub-pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+/* --- ESTILOS ESPECÍFICOS (Solo estructura y Hover nativo) --- */
+
+/* YouTube */
+.yt-btn-style {
+  width: 48px;
+  height: 100%;
+}
+
+.yt-btn-style::before {
+  content: "";
+  position: absolute;
+  display: block;
+  top: 50%;
+  left: 50%;
+  -webkit-transform: translate(-50%, -50%);
+  -ms-transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%);
+  border-radius: 40px;
+  background-color: transparent;
+  pointer-events: none;
+  width: 48px;
+  height: calc(var(--yt-delhi-pill-height, 48px) - 8px);
+}
+
+.yt-btn-style:hover::before {
+  background-color: var(--yt-spec-overlay-button-secondary, rgba(255, 255, 255, 0.1));
+  -webkit-transition: background-color 0.2s cubic-bezier(0.05, 0, 0, 1);
+  transition: background-color 0.2s cubic-bezier(0.05, 0, 0, 1);
+}
+
+.yt-btn-style svg {
+  padding: 1em;
+}
+
+/* Kick */
+.kick-btn-style {
+  width: 2.75rem;
+  height: 2.75rem;
+  font-size: 1.25rem;
+}
+
+/* Twitch */
+.twitch-btn-style {
+  height: var(--button-size-default);
+  width: var(--button-size-default);
+  font-size: var(--button-text-default);
+  border-radius: var(--border-radius-rounded);
+}
+
+.twitch-btn-style:hover {
+  background-color: var(--color-background-button-text-hover);
+}
+
+.twitch-btn-style svg {
+  width: 2rem;
+  height: 2rem;
+}
