@@ -7,12 +7,22 @@ KEYS_FOLDER = "keys"
 PRIVATE_KEY = os.path.join(KEYS_FOLDER, "DownHub.pem")
 TEMP_CRX = os.path.join(KEYS_FOLDER, "temp.crx")
 MANIFEST = os.path.join(EXT_FOLDER, "manifest.json")
-MAIN_API = os.path.join("api", "main.py")
+NATIVE_REGISTRY = "net.wipodev.downhub"
 
-os.makedirs(KEYS_FOLDER, exist_ok=True)
+def injectKey(file, key, keyValue):
+    if not os.path.exists(file):
+        print(f"⚠️ Warning: {file} not found. Skipping injection.")
+        return
+    with open(file, "r", encoding="utf-8") as f:
+        newFile = json.load(f)
+    newFile[key] = keyValue
+    with open(file, "w", encoding="utf-8") as f:
+        json.dump(newFile, f, indent=2, ensure_ascii=False)
+
 
 # 1. Crear clave privada si no existe
 if not os.path.exists(PRIVATE_KEY):
+    os.makedirs(KEYS_FOLDER, exist_ok=True)
     creator.create_private_key_file(PRIVATE_KEY)
     print("✅ Private key generated:", PRIVATE_KEY)
 
@@ -28,31 +38,12 @@ pub_key = header_info.public_key
 print("✅ Extension ID:", ext_id)
 
 # 3. Insertar clave en manifest.json
-with open(MANIFEST, "r", encoding="utf-8") as f:
-    manifest = json.load(f)
-
-manifest["key"] = pub_key
-
-with open(MANIFEST, "w", encoding="utf-8") as f:
-    json.dump(manifest, f, indent=2, ensure_ascii=False)
-
+injectKey(MANIFEST, "key", pub_key)
 print("✅ Manifest.json updated with public key.")
 
-# 4. Reemplazar ID en api/main.py (allow_origins)
-with open(MAIN_API, "r", encoding="utf-8") as f:
-    lines = f.readlines()
-
-new_lines = []
-for line in lines:
-    if "chrome-extension://" in line:
-        new_lines.append(f'        "chrome-extension://{ext_id}",\n')
-    else:
-        new_lines.append(line)
-
-with open(MAIN_API, "w", encoding="utf-8") as f:
-    f.writelines(new_lines)
-
-print(f"✅ api/main.py updated with chrome-extension://{ext_id}")
+# 4. Reemplazar ID en native registry
+injectKey(NATIVE_REGISTRY, "allowed_origins", [f"chrome-extension://{ext_id}/"])
+print(f"✅ native registry updated with chrome-extension://{ext_id}")
 
 # 5. Limpiar crx temporal
 if os.path.exists(TEMP_CRX):

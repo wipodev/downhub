@@ -6,7 +6,4 @@ __pycache__/
 keys/
 build/
 dist/
-*.spec
-Output/
-ffmpeg.exe
-ffprobe.exe
+bin/

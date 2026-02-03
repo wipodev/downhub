@@ -1,0 +1,7 @@
+{
+  "name": "net.wipodev.downhub",
+  "description": "DownHub Native Video Downloader Host",
+  "path": "DownHubService.exe",
+  "type": "stdio",
+  "allowed_origins": ["chrome-extension://aoajebnokccpepbkcdinhkpclikhmink/"]
+}

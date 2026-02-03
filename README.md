@@ -1,180 +1,73 @@
-# DownHub
+# 📥 DownHub: Professional Native Video Downloader
 
-DownHub is an application that bundles a **Python FastAPI backend**, a **local Tkinter GUI**, and a **Chrome extension** to download videos seamlessly from multiple platforms.
+**DownHub** is an advanced and minimalist solution for high-quality video downloading. Unlike conventional browser extensions, it uses a **Chrome Native Messaging** architecture to communicate directly with a native Python host, enabling robust, efficient download management without the limitations of the browser environment.
 
-Initially created for **YouTube**, it now supports **Kick**, and since it uses `yt-dlp`, you can also download from most other video sites by pasting the URL into the GUI.
+## ✨ Key Features
 
----
+- **Native Architecture:** High-performance, bidirectional communication between the Chrome extension and the operating system via the native messaging protocol.
+- **Powerful Engine:** Uses the `yt-dlp` binary to ensure compatibility with the latest video algorithms and enable high-speed downloads.
+- **Multi-Platform Support:** Dynamic adaptation of the interface and download buttons for:
+  - **YouTube**
+  - **Kick**
+  - **Twitch**
+- **Intelligent Process Management:** One-click cancellation system that safely terminates the entire process tree (including FFmpeg) and automatically cleans up temporary files (`.part`).
+- **Minimalist Interface:** A clean, modern design that seamlessly integrates into each website’s DOM, including visual progress indicators.
 
-## Table of Contents
+## 🛠️ Project Structure
 
-- [Overview](#overview)
-- [Features](#features)
-- [How It Works](#how-it-works)
-- [Architecture](#architecture)
-- [Project Structure](#project-structure)
-- [Requirements](#requirements)
-- [Installation](#installation)
-- [Usage](#usage)
-- [Building](#building)
-- [License](#license)
-- [Disclaimer](#disclaimer)
-
----
-
-## Overview
-
-DownHub runs a **local background service (DownHubService.exe)** that listens for download requests. A **GUI client** allows pasting any video URL, and a **Chrome extension** injects a download button into YouTube and Kick video players.
-
-All downloaded files are automatically saved to the user’s **Downloads** folder, with audio and video streams merged via **FFmpeg**.
-
----
-
-## Features
-
-- One‑click download directly from **YouTube** and **Kick** players.
-- GUI to paste and download from any `yt-dlp` supported site.
-- Background FastAPI service exposing `/download` and `/status` endpoints.
-- Task management with progress and error reporting.
-- GUI with clipboard paste and real‑time logs.
-- Chrome extension with custom button injection and toast notifications.
-- Bundled **FFmpeg/ffprobe** executables for processing.
-- Windows installer built with **Inno Setup**.
-
----
-
-## How It Works
-
-1. **Chrome extension** injects a Download button into the video player (YouTube/Kick).
-2. Clicking the button sends the video URL to the local FastAPI backend.
-3. Backend spawns a `yt-dlp` job that downloads video+audio and merges them to MP4.
-4. Progress and status updates are exposed at `/status/<task_id>`.
-5. GUI can trigger the same `/download` endpoint by pasting URLs manually.
-6. Once finished, the file is placed in the user’s **Downloads** directory.
-
----
-
-## Architecture
-
-- **Backend (**``**)**: FastAPI + `yt-dlp` job manager with task tracking.
-- **GUI (**``**)**: Tkinter app for pasting URLs and viewing logs.
-- **Extension (**``**)**: Manifest v3 extension that injects buttons and sends requests to backend.
-- **Build system**: `setup_api.py` (cx_Freeze) compiles backend/GUI, `setup_installer.iss` builds Windows installer.
-
----
-
-## Project Structure
-
-```
-└── downtube
-    └── api
-        └── main.py        # FastAPI backend service
-        └── gui.py         # Tkinter GUI
-        └── bin/           # ffmpeg + ffprobe executables
-    └── extension
-        └── content.js     # Injects buttons into players
-        └── background.js  # Forwards requests to backend
-        └── manifest.json  # Chrome extension manifest (MV3)
-        └── toast.css      # Notification styles
-    └── assets             # Icons
-    └── build.py           # Build pipeline
-    └── run_all.py         # Runs backend + GUI for dev
-    └── setup_api.py       # cx_Freeze build config
-    └── setup_installer.iss# Inno Setup installer script
+```text
+downhub/
+├── extension/          # Extension source code (JS, CSS, Manifest)
+├── src/                # Native Python host
+├── assets/             # Visual assets and icons
+├── bin/                # External binaries (yt-dlp, ffmpeg)
+├── build.py            # Build automation script
+├── extension_key.py    # Extension ID and key generator
+└── setup.iss           # Installer creation script (Inno Setup)
 ```
 
----
+## 🚀 Installation & Deployment
 
-## Requirements
+### Prerequisites
 
-### API / GUI
+- Python 3.x
+- Google Chrome (or Chromium-based browsers)
+- Inno Setup 6 (optional, for generating the `.exe` installer)
 
-- Python 3.9+
-- Dependencies: `fastapi`, `yt-dlp`, `uvicorn`, `pydantic`, `tkinter`, `requests`
-- Windows OS (installer provided)
-- `ffmpeg.exe` and `ffprobe.exe` (bundled in `api/bin`)
+### Step 1: Extension Setup
 
-### Chrome Extension
+1. Run `extension_key.py` to generate a unique ID for your extension and link it to the native host.
+2. Load the `extension/` folder in Chrome via `chrome://extensions` with Developer Mode enabled.
 
-- **Google Chrome** (Manifest v3 support)
+### Step 2: Native Host Build
 
----
+Run the build script to generate the service executable:
 
-## Installation
+```bash
+python build.py --keys
+```
 
-### Step 1 — Backend + GUI
+### Step 3: System Registration
 
-1. Clone repository:
+For Chrome to recognize the host, the JSON manifest must be registered in the Windows registry:
 
-   ```bash
-   git clone https://github.com/wipodev/downhub.git
-   cd downhub
-   ```
+1. Use the installer generated with `build.py --inno`, or
+2. Manually apply the `install_host.reg` file.
 
-2. Install dependencies:
+## 🔧 Technical Details
 
-   ```bash
-   pip install -r requirements.txt
-   ```
+### Communication Protocol
 
-3. Start the backend:
+The native host (`native_host.py`) uses a binary packet structure to handle message lengths, preventing common buffer overflow issues in Chrome’s `stdio` communication.
 
-   ```bash
-   python api/main.py
-   ```
+### Cancellation Handling
 
-   Runs at `http://127.0.0.1:8000`.
+When a user cancels a download, the system executes a `taskkill` command with the `/T` flag to ensure that the main `yt-dlp` process and its child encoding processes (FFmpeg) are instantly terminated, releasing file locks for cleanup.
 
-4. Optionally start the GUI:
+## ⚖️ License
 
-   ```bash
-   python api/gui.py
-   ```
-
-### Step 2 — Chrome Extension
-
-1. Open Chrome → `chrome://extensions`
-2. Enable **Developer mode**
-3. Click **Load unpacked**
-4. Select `extension/` folder
+This project is licensed under the **Apache License 2.0**. See the `LICENSE` file for more details.
 
 ---
 
-## Usage
-
-### From Chrome Extension
-
-- Open a YouTube or Kick video.
-- A **Download button** appears.
-- Click to start; video saves to **Downloads** folder.
-
-### From GUI
-
-- Run **DownHubGUI.exe** (or `python api/gui.py`).
-- Paste any supported URL.
-- Click **Download** → file saved in **Downloads**.
-
----
-
-## Building
-
-### Windows Installer
-
-1. Install [Inno Setup](https://jrsoftware.org/isinfo.php)
-2. Run build script:
-   ```bash
-   python build.py
-   ```
-3. Installer will appear in `Output/`.
-
----
-
-## License
-
-This project is licensed under the **MIT License**.
-
----
-
-## Disclaimer
-
-This project is **not affiliated with YouTube, Kick, or Google**. It is intended for educational purposes only. Downloading copyrighted content without authorization may violate terms of service. The author assumes no responsibility for misuse.
+Developed by **WipoDev**.
