@@ -1,6 +1,6 @@
 [Setup]
 AppName=DownHub
-AppVersion=1.0.0
+AppVersion=1.1.0
 AppPublisher=WipoDev
 AppPublisherURL=https://github.com/wipodev/downhub
 AppSupportURL=https://github.com/wipodev/downhub/issues
@@ -9,9 +9,9 @@ VersionInfoCompany=WipoDev
 VersionInfoCopyright=© 2026 WipoDev. Apache 2.0 License.
 VersionInfoDescription=Instalador de DownHub
 VersionInfoProductName=DownHub
-VersionInfoProductVersion=1.0.0.0
-VersionInfoTextVersion=1.0.0.0
-VersionInfoVersion=1.0.0.0
+VersionInfoProductVersion=1.1.0.0
+VersionInfoTextVersion=1.1.0.0
+VersionInfoVersion=1.1.0.0
 DefaultDirName={localappdata}\DownHub
 DefaultGroupName=DownHub
 PrivilegesRequired=lowest
