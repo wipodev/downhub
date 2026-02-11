@@ -116,3 +116,37 @@
   width: 2rem;
   height: 2rem;
 }
+
+/* TikTok */
+.tiktok-btn-style {
+  display: flex;
+  height: 50px;
+  width: 100%;
+  min-width: 14rem;
+  padding-inline: 14px;
+  font-family: var(--tux-web-font-body);
+  border-radius: 8px;
+  font-size: 18px;
+  font-style: normal;
+  font-weight: 500;
+  justify-content: start;
+  color: #f6f6f6;
+}
+
+.tiktok-btn-style:hover {
+  background-color: var(--ui-shape-neutral-4);
+}
+
+.tiktok-btn-style svg {
+  width: 1em;
+  height: 1em;
+  margin-right: 8px;
+  margin-left: 2px;
+}
+
+.tiktok-btn-style::after {
+  content: attr(title);
+  font-size: 16px;
+  flex: 1;
+  text-align: left;
+}

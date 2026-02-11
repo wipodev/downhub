@@ -17,7 +17,9 @@
     "https://www.kick.com/*",
     "https://kick.com/*",
     "https://www.twitch.tv/*",
-    "https://twitch.tv/*"
+    "https://twitch.tv/*",
+    "https://www.tiktok.com/*",
+    "https://tiktok.com/*"
   ],
   "background": {
     "service_worker": "background/main.js"
@@ -36,7 +38,9 @@
         "https://www.kick.com/*",
         "https://kick.com/*",
         "https://www.twitch.tv/*",
-        "https://twitch.tv/*"
+        "https://twitch.tv/*",
+        "https://www.tiktok.com/*",
+        "https://tiktok.com/*"
       ],
       "css": ["ui/styles/button.css"],
       "js": ["utils/config.js", "utils/dom.js", "core/downloader.js", "content/siteRegistry.js", "content/main.js"],

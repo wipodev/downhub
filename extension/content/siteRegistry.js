@@ -30,4 +30,12 @@ const sites = [
     title: "Descargar con DownHub",
     styleClass: "twitch-btn-style",
   },
+  {
+    name: "TikTok",
+    match: () => location.hostname.includes("tiktok.com"),
+    selector: ".context-menu",
+    id: "dl-btn-tiktok",
+    title: "Descargar con DownHub",
+    styleClass: "tiktok-btn-style",
+  },
 ];
