@@ -38,4 +38,12 @@ const sites = [
     title: "Descargar con DownHub",
     styleClass: "tiktok-btn-style",
   },
+  {
+    name: "PornHub",
+    match: () => location.hostname.includes("pornhub.com"),
+    selector: ".mgp_control-buttons-right",
+    id: "dl-btn-pornhub",
+    title: "Descargar con DownHub",
+    styleClass: "pornhub-btn-style",
+  },
 ];

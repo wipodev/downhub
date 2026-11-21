@@ -20,6 +20,7 @@ async function injectButton(site) {
   btn.title = site.title;
   // Estado inicial
   btn.setAttribute("data-status", "idle");
+  btn.setAttribute("data-text", site.title);
 
   // Icono SVG minimalista para evitar dependencias de archivos externos
   btn.innerHTML = `

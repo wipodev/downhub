@@ -19,7 +19,9 @@
     "https://www.twitch.tv/*",
     "https://twitch.tv/*",
     "https://www.tiktok.com/*",
-    "https://tiktok.com/*"
+    "https://tiktok.com/*",
+    "https://pornhub.com/*",
+    "https://*.pornhub.com/*"
   ],
   "background": {
     "service_worker": "background/main.js"
@@ -40,7 +42,9 @@
         "https://www.twitch.tv/*",
         "https://twitch.tv/*",
         "https://www.tiktok.com/*",
-        "https://tiktok.com/*"
+        "https://tiktok.com/*",
+        "https://pornhub.com/*",
+        "https://*.pornhub.com/*"
       ],
       "css": ["ui/styles/button.css"],
       "js": ["utils/config.js", "utils/dom.js", "core/downloader.js", "content/siteRegistry.js", "content/main.js"],
