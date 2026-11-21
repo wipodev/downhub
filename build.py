@@ -1,56 +1,145 @@
-import os, sys
-import subprocess
+import os
+import sys
+import re
+import json
 import shutil
+import zipfile
+import subprocess
 from pathlib import Path
 
-# --- CONFIGURACIÓN DE RUTAS ---
+# --- PATH CONFIGURATION ---
 APPDATA = os.environ.get('LOCALAPPDATA')
 INNO_SETUP_EXE = Path(APPDATA) / "Programs/Inno Setup 6/ISCC.exe"
 BASE_DIR = Path(__file__).parent
+
+VERSION_FILE = BASE_DIR / "VERSION"
+NATIVE_HOST_FILE = BASE_DIR / "src" / "native_host.py"
+MANIFEST_FILE = BASE_DIR / "extension" / "manifest.json"
+VERSION_INFO_FILE = BASE_DIR / "version_info.txt"
 SPEC_FILE = BASE_DIR / "native_host.spec"
 ISS_FILE = BASE_DIR / "setup.iss"
+DIST_DIR = BASE_DIR / "dist"
+
+
+def get_service_version():
+    """Read and validate the native service version from the root VERSION file."""
+    if not VERSION_FILE.exists():
+        print("[-] Error: VERSION file not found in project root.")
+        sys.exit(1)
+    version = VERSION_FILE.read_text(encoding="utf-8").strip().lstrip("vV")
+    if not re.match(r"^\d+\.\d+\.\d+$", version):
+        print(f"[-] Error: Invalid service version format '{version}'. Expected X.Y.Z.")
+        sys.exit(1)
+    return version
+
+
+def get_extension_version():
+    """Read the independent extension version directly from extension/manifest.json."""
+    if not MANIFEST_FILE.exists():
+        return "unknown"
+    data = json.loads(MANIFEST_FILE.read_text(encoding="utf-8"))
+    return data.get("version", "unknown")
+
+
+def sync_service_version(version):
+    """Propagate the service version across Python source, PyInstaller, and Inno Setup."""
+    parts = [int(x) for x in version.split(".")]
+    version_4_tuple = f"({parts[0]}, {parts[1]}, {parts[2]}, 0)"
+    version_4_str = f"{version}.0"
+
+    print(f"[*] Synchronizing Service version {version} across native files...")
+
+    # 1. Update APP_VERSION in src/native_host.py
+    nh_text = NATIVE_HOST_FILE.read_text(encoding="utf-8")
+    nh_text = re.sub(r'APP_VERSION\s*=\s*["\'][^"\']+["\']', f'APP_VERSION = "{version}"', nh_text)
+    NATIVE_HOST_FILE.write_text(nh_text, encoding="utf-8")
+
+    # 2. Update version_info.txt for PyInstaller executable metadata
+    if VERSION_INFO_FILE.exists():
+        vi_text = VERSION_INFO_FILE.read_text(encoding="utf-8")
+        vi_text = re.sub(r"filevers=\(\d+,\s*\d+,\s*\d+,\s*\d+\)", f"filevers={version_4_tuple}", vi_text)
+        vi_text = re.sub(r"prodvers=\(\d+,\s*\d+,\s*\d+,\s*\d+\)", f"prodvers={version_4_tuple}", vi_text)
+        vi_text = re.sub(r"StringStruct\('FileVersion',\s*'[^']+'\)", f"StringStruct('FileVersion', '{version}')", vi_text)
+        vi_text = re.sub(r"StringStruct\('ProductVersion',\s*'[^']+'\)", f"StringStruct('ProductVersion', '{version}')", vi_text)
+        VERSION_INFO_FILE.write_text(vi_text, encoding="utf-8")
+
+    # 3. Update setup.iss for Inno Setup installer metadata
+    if ISS_FILE.exists():
+        iss_text = ISS_FILE.read_text(encoding="utf-8")
+        iss_text = re.sub(r"^AppVersion=.*$", f"AppVersion={version}", iss_text, flags=re.MULTILINE)
+        iss_text = re.sub(r"^VersionInfoProductVersion=.*$", f"VersionInfoProductVersion={version_4_str}", iss_text, flags=re.MULTILINE)
+        iss_text = re.sub(r"^VersionInfoTextVersion=.*$", f"VersionInfoTextVersion={version_4_str}", iss_text, flags=re.MULTILINE)
+        iss_text = re.sub(r"^VersionInfoVersion=.*$", f"VersionInfoVersion={version_4_str}", iss_text, flags=re.MULTILINE)
+        ISS_FILE.write_text(iss_text, encoding="utf-8")
+
+    print(f"[+] Native service files synced to v{version}.")
+
 
 def run_command(command, app):
-    """Execute a command on the system"""
+    """Execute a system command and exit on failure."""
     try:
         subprocess.check_call(command, shell=True)
         print(f"[+] {app} generado con éxito.")
     except subprocess.CalledProcessError as e:
         print(f"[-] Error executing {app}: {e}")
-        exit(1)
+        sys.exit(1)
+
 
 def clean_folders():
-    """Elimina carpetas de compilaciones anteriores para evitar basura."""
-    folders = [BASE_DIR / "dist", BASE_DIR / "build"]
-    for folder in folders:
+    """Remove previous build directories to avoid stale artifacts."""
+    for folder in [DIST_DIR, BASE_DIR / "build"]:
         if folder.exists():
             print(f"[*] Limpiando {folder.name}...")
             shutil.rmtree(folder)
 
+
+def package_extension_zip(ext_version):
+    """Package the extension folder contents into dist/extension.zip for GitHub Releases."""
+    ext_dir = BASE_DIR / "extension"
+    zip_path = DIST_DIR / "extension.zip"
+    if not ext_dir.exists():
+        return
+    print(f"[*] Empaquetando dist/extension.zip (Extensión v{ext_version})...")
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        for file_path in ext_dir.rglob("*"):
+            if file_path.is_file():
+                zf.write(file_path, file_path.relative_to(ext_dir))
+    print("[+] dist/extension.zip generado con éxito.")
+
+
 def run_inno_setup():
-    """Ejecuta el compilador de Inno Setup."""
+    """Run the Inno Setup compiler."""
     print("[*] Iniciando Inno Setup...")
     if not INNO_SETUP_EXE.exists():
         print(f"[-] Error: No se encontró ISCC.exe en {INNO_SETUP_EXE}")
-        exit(1)
-    run_command(f'"{str(INNO_SETUP_EXE)}" {str(ISS_FILE)}', "Instalador")
+        sys.exit(1)
+    run_command(f'"{str(INNO_SETUP_EXE)}" "{str(ISS_FILE)}"', "Instalador")
+
 
 def main():
     print("--- INICIANDO PROCESO DE BUILD ---")
-    clean_folders()
-
+    service_version = get_service_version()
+    ext_version = get_extension_version()
     args = [a.lower() for a in sys.argv[1:]]
+
+    clean_folders()
+    sync_service_version(service_version)
+
     if "--keys" in args or "keys" in args or "-k" in args:
         print("Generating extension key and updating files...")
         run_command("python extension_key.py", "key")
 
     print("[*] Iniciando PyInstaller...")
-    run_command(f"pyinstaller {str(SPEC_FILE)}", "Ejecutable")
+    run_command(f'pyinstaller "{str(SPEC_FILE)}"', "Ejecutable")
 
-    args = [a.lower() for a in sys.argv[1:]]
+    if "--ext" in args or "ext" in args or "-e" in args:
+        package_extension_zip(ext_version)
+
     if "--inno" in args or "inno" in args or "-i" in args:
         run_inno_setup()
-    print("--- PROCESO FINALIZADO ---")
+
+    print(f"--- PROCESO FINALIZADO (Service: v{service_version} | Extension: v{ext_version}) ---")
+
 
 if __name__ == "__main__":
     main()
