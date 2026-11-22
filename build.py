@@ -94,6 +94,7 @@ def compile_nuitka(version):
         '--standalone '
         '--onefile '
         '--remove-output '
+        '--assume-yes-for-downloads '
         '--windows-console-mode=disable '
         '--include-windows-runtime-dlls=yes '
         '--include-package=updater '
