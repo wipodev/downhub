@@ -15,10 +15,10 @@ BASE_DIR = Path(__file__).parent
 VERSION_FILE = BASE_DIR / "VERSION"
 CONFIG_FILE = BASE_DIR / "src" / "config.py"
 MANIFEST_FILE = BASE_DIR / "extension" / "manifest.json"
-VERSION_INFO_FILE = BASE_DIR / "version_info.txt"
-SPEC_FILE = BASE_DIR / "native_host.spec"
+ENTRY_POINT = BASE_DIR / "src" / "native_host.py"
 ISS_FILE = BASE_DIR / "setup.iss"
 DIST_DIR = BASE_DIR / "dist"
+ICON_FILE = BASE_DIR / "assets" / "icon_service.ico"
 
 
 def get_service_version():
@@ -42,28 +42,17 @@ def get_extension_version():
 
 
 def sync_service_version(version):
-    """Propagate the service version across Python source, PyInstaller, and Inno Setup."""
-    parts = [int(x) for x in version.split(".")]
-    version_4_tuple = f"({parts[0]}, {parts[1]}, {parts[2]}, 0)"
+    """Propagate the service version across Python source and Inno Setup."""
     version_4_str = f"{version}.0"
 
     print(f"[*] Synchronizing Service version {version} across native files...")
 
-    # 1. Update APP_VERSION in src/native_host.py
+    # 1. Update APP_VERSION in src/config.py
     nh_text = CONFIG_FILE.read_text(encoding="utf-8")
     nh_text = re.sub(r'APP_VERSION\s*=\s*["\'][^"\']+["\']', f'APP_VERSION = "{version}"', nh_text)
     CONFIG_FILE.write_text(nh_text, encoding="utf-8")
 
-    # 2. Update version_info.txt for PyInstaller executable metadata
-    if VERSION_INFO_FILE.exists():
-        vi_text = VERSION_INFO_FILE.read_text(encoding="utf-8")
-        vi_text = re.sub(r"filevers=\(\d+,\s*\d+,\s*\d+,\s*\d+\)", f"filevers={version_4_tuple}", vi_text)
-        vi_text = re.sub(r"prodvers=\(\d+,\s*\d+,\s*\d+,\s*\d+\)", f"prodvers={version_4_tuple}", vi_text)
-        vi_text = re.sub(r"StringStruct\('FileVersion',\s*'[^']+'\)", f"StringStruct('FileVersion', '{version}')", vi_text)
-        vi_text = re.sub(r"StringStruct\('ProductVersion',\s*'[^']+'\)", f"StringStruct('ProductVersion', '{version}')", vi_text)
-        VERSION_INFO_FILE.write_text(vi_text, encoding="utf-8")
-
-    # 3. Update setup.iss for Inno Setup installer metadata
+    # 2. Update setup.iss for Inno Setup installer metadata
     if ISS_FILE.exists():
         iss_text = ISS_FILE.read_text(encoding="utf-8")
         iss_text = re.sub(r"^AppVersion=.*$", f"AppVersion={version}", iss_text, flags=re.MULTILINE)
@@ -91,6 +80,33 @@ def clean_folders():
         if folder.exists():
             print(f"[*] Limpiando {folder.name}...")
             shutil.rmtree(folder)
+
+
+def compile_nuitka(version):
+    """Compile native_host.py into a standalone Windows executable using Nuitka."""
+    version_4_str = f"{version}.0"
+    print(f"[*] Iniciando Nuitka (v{version})...")
+    icon_flag = f'--windows-icon-from-ico="{str(ICON_FILE)}" ' if ICON_FILE.exists() else ""
+    cmd = (
+        f'"{sys.executable}" -m nuitka '
+        '--standalone '
+        '--onefile '
+        '--remove-output '
+        '--windows-console-mode=disable '
+        '--include-windows-runtime-dlls=yes '
+        '--include-package=updater '
+        f'{icon_flag}'
+        '--company-name="WipoDev" '
+        '--product-name="DownHub" '
+        '--file-description="DownHub Native Messaging Host" '
+        '--copyright="Copyright (c) 2026 WipoDev" '
+        f'--file-version="{version_4_str}" '
+        f'--product-version="{version_4_str}" '
+        f'--output-dir="{str(DIST_DIR)}" '
+        '--output-filename="DownHubService.exe" '
+        f'"{str(ENTRY_POINT)}"'
+    )
+    run_command(cmd, "Ejecutable Nuitka")
 
 
 def package_extension_zip(ext_version):
@@ -129,8 +145,7 @@ def main():
         print("Generating extension key and updating files...")
         run_command("python extension_key.py", "key")
 
-    print("[*] Iniciando PyInstaller...")
-    run_command(f'pyinstaller "{str(SPEC_FILE)}"', "Ejecutable")
+    compile_nuitka(service_version)
 
     if "--ext" in args or "ext" in args or "-e" in args:
         package_extension_zip(ext_version)

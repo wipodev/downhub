@@ -2,6 +2,7 @@ import sys
 import os
 import logging
 from pathlib import Path
+from typing import Any
 
 # -----------------------------
 # App Metadata & Protocol
@@ -18,7 +19,19 @@ MESSAGES = {
 # -----------------------------
 # Paths & Directories
 # -----------------------------
-BASE_DIR = Path(sys.executable).parent if getattr(sys, "frozen", False) else Path(__file__).parent
+def resolve_base_dir() -> Path:
+    """Resolve the persistent directory where the executable or source resides."""
+    compiled: Any = globals().get("__compiled__")
+    if compiled is not None:
+        return Path(compiled.containing_dir).resolve()
+
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+
+    return Path(__file__).resolve().parent
+
+
+BASE_DIR = resolve_base_dir()
 LOG_FILE = BASE_DIR / "debug_native.log"
 YTDLP_STAMP_FILE = BASE_DIR / "bin" / ".last_ytdlp_update"
 APP_STAMP_FILE = BASE_DIR / ".last_app_update"
