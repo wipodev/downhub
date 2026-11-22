@@ -12,7 +12,7 @@ from updater import GitHubUpdater
 # -----------------------------
 # App Metadata & Protocol
 # -----------------------------
-APP_VERSION = "1.2.0"
+APP_VERSION = "1.2.2"
 GITHUB_REPO = "wipodev/downhub"
 
 MESSAGES = {
