@@ -1,154 +1,36 @@
-import sys
-import json
-import struct
-import subprocess
 import os
-import logging
+import sys
 import time
+import logging
+import subprocess
 from pathlib import Path
 
-from updater import GitHubUpdater
+from config import (
+    APP_VERSION,
+    BASE_DIR,
+    YTDLP_PATH,
+    FFMPEG_PATH,
+    get_downloads_folder,
+    setup_logging,
+)
+from messaging import read_message, send_progress, send_done, send_error
+from app_updater import ensure_ytdlp_updated, run_background_app_update
 
-# -----------------------------
-# App Metadata & Protocol
-# -----------------------------
-APP_VERSION = "1.2.2"
-GITHUB_REPO = "wipodev/downhub"
-
-MESSAGES = {
-    "PROGRESS": "NATIVE_PROGRESS",
-    "DONE": "NATIVE_DONE",
-    "ERROR": "NATIVE_ERROR"
-}
+setup_logging()
+logger = logging.getLogger(__name__)
+logger.info(f"--- Starting DownHub Native Host v{APP_VERSION} ---")
 
 current_process = None
 
-# -----------------------------
-# Paths and Directories
-# -----------------------------
-BASE_DIR = Path(sys.executable).parent if getattr(sys, 'frozen', False) else Path(__file__).parent
-LOG_FILE = BASE_DIR / "debug_native.log"
-YTDLP_STAMP_FILE = BASE_DIR / "bin" / ".last_ytdlp_update"
-APP_STAMP_FILE = BASE_DIR / ".last_app_update"
 
-YTDLP_PATH = BASE_DIR / "bin" / "yt-dlp.exe"
-FFMPEG_PATH = BASE_DIR / "bin" / "ffmpeg.exe"
-EXTENSION_DIR = BASE_DIR / "extension"
-
-logging.basicConfig(
-    filename=LOG_FILE,
-    level=logging.DEBUG,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    filemode="w"
-)
-
-logging.info(f"--- Starting DownHub Native Host v{APP_VERSION} ---")
-
-# -----------------------------
-# Native Messaging Helpers
-# -----------------------------
-
-def read_message():
-    """Read a length-prefixed JSON message from Chrome via stdin."""
-    try:
-        raw_length = sys.stdin.buffer.read(4)
-        if not raw_length:
-            logging.warning("No message length received (possible disconnection)")
-            return None
-        message_length = struct.unpack("<I", raw_length)[0]
-        message = sys.stdin.buffer.read(message_length).decode("utf-8")
-        return json.loads(message)
-    except Exception as e:
-        logging.error(f"Error reading message: {e}")
-        return None
-
-def send_message(message):
-    """Send a length-prefixed JSON message back to Chrome via stdout."""
-    try:
-        encoded = json.dumps(message).encode("utf-8")
-        sys.stdout.buffer.write(struct.pack("<I", len(encoded)))
-        sys.stdout.buffer.write(encoded)
-        sys.stdout.buffer.flush()
-        return True
-    except (IOError, BrokenPipeError):
-        logging.error("Connection lost with Chrome (Cancellation detected)")
-        return False
-
-def get_downloads_folder():
-    """Return the current Windows user's Downloads directory."""
-    return Path(os.environ["USERPROFILE"]) / "Downloads"
-
-# -----------------------------
-# Modular App & Engine Updaters
-# -----------------------------
-
-def run_background_app_update():
-    """Silently check GitHub Releases and hot-swap modified components for the next run."""
-    targets = {
-        "DownHubService.exe": BASE_DIR / "DownHubService.exe",
-    }
-    if EXTENSION_DIR.exists():
-        targets["extension.zip"] = EXTENSION_DIR
-
-    updater = GitHubUpdater(
-        repo=GITHUB_REPO,
-        current_version=APP_VERSION,
-        asset_targets=targets,
-        stamp_file=APP_STAMP_FILE,
-    )
-    result = updater.check_and_update()
-    if result.updated:
-        logging.info(f"DownHub silently updated to {result.latest_version} for next run.")
-
-def ensure_ytdlp_updated(force=False):
-    """Update yt-dlp.exe if more than 24 hours have passed since the last check, or if forced."""
-    if not YTDLP_PATH.exists():
-        return
-
-    now = time.time()
-    update_interval = 86400
-
-    if not force and YTDLP_STAMP_FILE.exists():
-        try:
-            last_check = float(YTDLP_STAMP_FILE.read_text().strip())
-            if (now - last_check) < update_interval:
-                return
-        except ValueError:
-            pass
-
-    logging.info("Checking for yt-dlp updates...")
-    send_message({
-        "type": MESSAGES["PROGRESS"],
-        "percent": 0,
-        "status": "Verificando actualizaciones de motor..."
-    })
-
-    try:
-        result = subprocess.run(
-            [str(YTDLP_PATH), "-U"],
-            capture_output=True,
-            text=True,
-            timeout=30,
-            creationflags=subprocess.CREATE_NO_WINDOW
-        )
-        output = (result.stdout or "") + (result.stderr or "")
-        logging.info(f"yt-dlp update output: {output.strip()}")
-        YTDLP_STAMP_FILE.write_text(str(now))
-    except Exception as e:
-        logging.warning(f"Could not auto-update yt-dlp: {e}")
-
-# -----------------------------
-# Download Logic
-# -----------------------------
-
-def download_video(url, filename):
+def download_video(url: str, filename: str) -> None:
     """Execute yt-dlp as a subprocess and stream progress back to the extension."""
-    logging.info(f"Download started for: {url}")
     global current_process
+    logger.info(f"Download started for: {url}")
     output_template = str(get_downloads_folder() / filename)
-    
+
     if not YTDLP_PATH.exists():
-        send_message({"type": MESSAGES["ERROR"], "message": f"Falta yt-dlp.exe en {BASE_DIR}"})
+        send_error(f"Falta yt-dlp.exe en {BASE_DIR}")
         os._exit(1)
 
     ensure_ytdlp_updated(force=False)
@@ -161,7 +43,7 @@ def download_video(url, filename):
         "--merge-output-format", "mp4",
         "--newline",
         "--progress",
-        "--no-playlist"
+        "--no-playlist",
     ]
 
     last_error = "Error en el proceso de descarga"
@@ -173,134 +55,122 @@ def download_video(url, filename):
             stderr=subprocess.STDOUT,
             universal_newlines=True,
             bufsize=1,
-            creationflags=subprocess.CREATE_NO_WINDOW
+            creationflags=subprocess.CREATE_NO_WINDOW,
         )
-        logging.info(f"yt-dlp subprocess launched (PID: {current_process.pid})")
+        logger.info(f"yt-dlp subprocess launched (PID: {current_process.pid})")
 
         for line in current_process.stdout:
             line = line.strip()
 
             if "ERROR:" in line:
-                logging.error(f"YT-DLP DETAIL: {line}")
+                logger.error(f"YT-DLP DETAIL: {line}")
                 last_error = line.replace("ERROR:", "").strip()
-            
+
             if "[download]" in line and "%" in line:
                 try:
-                    parts = line.split()
-                    for p in parts:
-                        if "%" in p:
-                            percent_val = float(p.replace("%", ""))
-                            if not send_message({
-                                "type": MESSAGES["PROGRESS"],
-                                "percent": percent_val,
-                                "status": "Descargando video..."
-                            }):
+                    for part in line.split():
+                        if "%" in part:
+                            percent_val = float(part.replace("%", ""))
+                            if not send_progress(percent_val, "Descargando video..."):
                                 cancel_download(output_template)
                             break
                 except Exception:
                     pass
 
             elif "[Merger]" in line or "[VideoConvertor]" in line:
-                send_message({
-                    "type": MESSAGES["PROGRESS"],
-                    "percent": 99,
-                    "status": "Finalizando archivo (FFmpeg)..."
-                })
-            
+                send_progress(99, "Finalizando archivo (FFmpeg)...")
+
             elif "WARNING:" in line:
-                logging.warning(f"YT-DLP WARNING: {line}")
+                logger.warning(f"YT-DLP WARNING: {line}")
 
         current_process.wait()
-        logging.info(f"Download finished with return code: {current_process.returncode}")
+        logger.info(f"Download finished with return code: {current_process.returncode}")
 
         if current_process.returncode == 0:
-            send_message({"type": MESSAGES["DONE"]})
+            send_done()
             run_background_app_update()
             os._exit(0)
         else:
             if current_process.returncode < 0:
-                send_message({"type": MESSAGES["ERROR"], "message": "Descarga cancelada."})
-                logging.error("Download cancelled.")
+                send_error("Descarga cancelada.")
+                logger.error("Download cancelled.")
             else:
                 if "403" in last_error or "Forbidden" in last_error:
                     ensure_ytdlp_updated(force=True)
                     last_error = "YouTube bloqueó la descarga (403). Motor actualizado: intenta de nuevo."
-                send_message({"type": MESSAGES["ERROR"], "message": last_error})
-                logging.error(f"Download failed: {last_error}")
+                send_error(last_error)
+                logger.error(f"Download failed: {last_error}")
                 run_background_app_update()
             os._exit(1)
 
     except Exception as e:
-        send_message({"type": MESSAGES["ERROR"], "message": str(e)})
-        logging.error(f"Exception in download thread: {e}")
+        send_error(str(e))
+        logger.error(f"Exception in download thread: {e}")
         os._exit(1)
 
-# -----------------------------
-# Cancellation & Cleanup
-# -----------------------------
 
-def cancel_download(file):
+def cancel_download(file_path: str) -> None:
     """Kill yt-dlp and child FFmpeg processes and remove partial files."""
     if hasattr(cancel_download, "_running"):
         return
     cancel_download._running = True
 
-    logging.info("--- Starting cleanup process ---")
-    
+    logger.info("--- Starting cleanup process ---")
+
     global current_process
     if current_process:
-        logging.info(f"Terminating process tree for PID: {current_process.pid}")
+        logger.info(f"Terminating process tree for PID: {current_process.pid}")
         try:
             subprocess.run(
-                ['taskkill', '/F', '/T', '/PID', str(current_process.pid)], 
+                ["taskkill", "/F", "/T", "/PID", str(current_process.pid)],
                 capture_output=True,
-                creationflags=subprocess.CREATE_NO_WINDOW
+                creationflags=subprocess.CREATE_NO_WINDOW,
             )
         except Exception as e:
-            logging.error(f"Error using taskkill: {e}")
+            logger.error(f"Error using taskkill: {e}")
             current_process.kill()
 
-    time.sleep(2.0) 
+    time.sleep(2.0)
 
-    folder = Path(file).parent
-    base_name = Path(file).stem
+    folder = Path(file_path).parent
+    base_name = Path(file_path).stem
 
     for attempt in range(5):
         all_cleared = True
         for temp_file in folder.glob("*"):
-            if base_name in temp_file.name and (temp_file.suffix in ['.part', '.temp', '.ykv', '.yka'] or ".part" in temp_file.name):
+            if base_name in temp_file.name and (
+                temp_file.suffix in [".part", ".temp", ".ykv", ".yka"] or ".part" in temp_file.name
+            ):
                 try:
                     if temp_file.exists():
                         os.remove(temp_file)
-                        logging.info(f"Removed on attempt {attempt+1}: {temp_file.name}")
+                        logger.info(f"Removed on attempt {attempt + 1}: {temp_file.name}")
                 except OSError:
                     all_cleared = False
         if all_cleared:
             break
         time.sleep(1.0)
 
-    logging.info("Cleanup finished. Exiting.")
+    logger.info("Cleanup finished. Exiting.")
     os._exit(0)
 
-# -----------------------------
-# Main Entrypoint
-# -----------------------------
 
-def main():
+def main() -> None:
     """Main entry point invoked by Chrome Native Messaging."""
     if sys.stdin is None:
-        logging.warning("Manual execution detected (no stdin). This binary must be invoked by Chrome.")
+        logger.warning("Manual execution detected (no stdin). This binary must be invoked by Chrome.")
         sys.exit(0)
 
-    logging.info("=== DownHub Started (Main Thread) ===")
+    logger.info("=== DownHub Started (Main Thread) ===")
     msg = read_message()
-    
+
     if msg and msg.get("type") == "download_task":
         url = msg.get("url")
         filename = msg.get("filename", "video.mp4")
-        download_video(url, filename) 
-    
-    logging.info("Main Thread finished. Exiting.")
+        download_video(url, filename)
+
+    logger.info("Main Thread finished. Exiting.")
+
 
 if __name__ == "__main__":
     try:

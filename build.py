@@ -13,7 +13,7 @@ INNO_SETUP_EXE = Path(APPDATA) / "Programs/Inno Setup 6/ISCC.exe"
 BASE_DIR = Path(__file__).parent
 
 VERSION_FILE = BASE_DIR / "VERSION"
-NATIVE_HOST_FILE = BASE_DIR / "src" / "native_host.py"
+CONFIG_FILE = BASE_DIR / "src" / "config.py"
 MANIFEST_FILE = BASE_DIR / "extension" / "manifest.json"
 VERSION_INFO_FILE = BASE_DIR / "version_info.txt"
 SPEC_FILE = BASE_DIR / "native_host.spec"
@@ -50,9 +50,9 @@ def sync_service_version(version):
     print(f"[*] Synchronizing Service version {version} across native files...")
 
     # 1. Update APP_VERSION in src/native_host.py
-    nh_text = NATIVE_HOST_FILE.read_text(encoding="utf-8")
+    nh_text = CONFIG_FILE.read_text(encoding="utf-8")
     nh_text = re.sub(r'APP_VERSION\s*=\s*["\'][^"\']+["\']', f'APP_VERSION = "{version}"', nh_text)
-    NATIVE_HOST_FILE.write_text(nh_text, encoding="utf-8")
+    CONFIG_FILE.write_text(nh_text, encoding="utf-8")
 
     # 2. Update version_info.txt for PyInstaller executable metadata
     if VERSION_INFO_FILE.exists():
