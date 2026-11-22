@@ -1,15 +1,16 @@
 # 📥 DownHub: Professional Native Video Downloader
 
-**DownHub** is an advanced and minimalist solution for high-quality video downloading. Unlike conventional browser extensions, it uses a **Chrome Native Messaging** architecture to communicate directly with a native Python host, enabling robust, efficient download management without the limitations of the browser environment.
+**DownHub** is an advanced and minimalist solution for high-quality video downloading. Unlike conventional browser extensions, it uses a **Chrome Native Messaging** architecture to communicate directly with a natively compiled host (built with Nuitka), enabling robust, efficient download management without the limitations of the browser environment.
 
 ## ✨ Key Features
 
 - **Native Architecture:** High-performance, bidirectional communication between the Chrome extension and the operating system via the native messaging protocol.
-- **Powerful Engine:** Uses the `yt-dlp` binary to ensure compatibility with the latest video algorithms and enable high-speed downloads.
+- **Powerful Engine:** Uses `yt-dlp`, `ffmpeg`, and the `deno` JavaScript runtime to ensure full compatibility with the latest video streams and enable high-speed downloads.
 - **Multi-Platform Support:** Dynamic adaptation of the interface and download buttons for:
   - **YouTube**
   - **Kick**
   - **Twitch**
+- **Automatic Updates:** Built-in self-updating mechanism for both the native host (`wipodev/updater`) and `yt-dlp`.
 - **Intelligent Process Management:** One-click cancellation system that safely terminates the entire process tree (including FFmpeg) and automatically cleans up temporary files (`.part`).
 - **Minimalist Interface:** A clean, modern design that seamlessly integrates into each website’s DOM, including visual progress indicators.
 
@@ -18,51 +19,63 @@
 ```text
 downhub/
 ├── extension/          # Extension source code (JS, CSS, Manifest)
-├── src/                # Native Python host
+├── src/                # Modular native host source (Nuitka compiled)
+│   ├── native_host.py  # Main entry point and download orchestration
+│   ├── config.py       # Paths, version metadata, and logging setup
+│   ├── messaging.py    # Chrome Native Messaging stdio binary protocol
+│   └── app_updater.py  # Self-update integration via wipodev/updater
 ├── assets/             # Visual assets and icons
-├── bin/                # External binaries (yt-dlp, ffmpeg)
-├── build.py            # Build automation script
+├── bin/                # Bundled runtimes (yt-dlp, ffmpeg, deno)
+├── build.py            # Automated Nuitka & Inno Setup build script
 ├── extension_key.py    # Extension ID and key generator
-└── setup.iss           # Installer creation script (Inno Setup)
+├── VERSION             # Single source of truth for native host version
+└── setup.iss           # Windows installer script (Inno Setup)
 ```
 
 ## 🚀 Installation & Deployment
 
-### Prerequisites
+### End Users (Recommended)
 
-- Python 3.x
+Download the latest signed Windows installer (`DownHub_Installer.exe`) directly from the [GitHub Releases](https://www.google.com/search?q=https://github.com/wipodev/downhub/releases) page and run it.
+
+### Building from Source
+
+#### Prerequisites
+
+- Python 3.11+
+- C Compiler (MSVC / Visual Studio Build Tools or MinGW64 for Nuitka)
+- Python packages: `nuitka`, `pillow`, and `updater` (`git+https://github.com/wipodev/updater.git`)
 - Google Chrome (or Chromium-based browsers)
 - Inno Setup 6 (optional, for generating the `.exe` installer)
 
-### Step 1: Extension Setup
+#### Step 1: Extension & Host Build
 
-1. Run `extension_key.py` to generate a unique ID for your extension and link it to the native host.
-2. Load the `extension/` folder in Chrome via `chrome://extensions` with Developer Mode enabled.
-
-### Step 2: Native Host Build
-
-Run the build script to generate the service executable:
+Run the automated build script to generate the extension key, compile `DownHubService.exe` natively with Nuitka, and package the installer:
 
 ```bash
-python build.py --keys
+python build.py --keys --ext --inno
+
 ```
 
-### Step 3: System Registration
+#### Step 2: Extension & System Registration
 
-For Chrome to recognize the host, the JSON manifest must be registered in the Windows registry:
-
-1. Use the installer generated with `build.py --inno`, or
-2. Manually apply the `install_host.reg` file.
+1. Load the `extension/` folder in Chrome via `chrome://extensions` with Developer Mode enabled (or use the packaged release).
+2. Run the installer generated in `dist/` to register the Native Messaging Host manifest in the Windows Registry.
 
 ## 🔧 Technical Details
 
 ### Communication Protocol
 
-The native host (`native_host.py`) uses a binary packet structure to handle message lengths, preventing common buffer overflow issues in Chrome’s `stdio` communication.
+The native host (`src/messaging.py`) uses a 32-bit unsigned integer binary header to frame JSON payloads over `stdin`/`stdout`, preventing buffer overflows or stream corruption in Chrome’s `stdio` communication.
 
 ### Cancellation Handling
 
-When a user cancels a download, the system executes a `taskkill` command with the `/T` flag to ensure that the main `yt-dlp` process and its child encoding processes (FFmpeg) are instantly terminated, releasing file locks for cleanup.
+When a user cancels a download, the system executes a `taskkill` command with the `/T` flag to ensure that the main `yt-dlp` process and its child encoding processes (`ffmpeg`) are instantly terminated, releasing file locks for cleanup.
+
+## 🔐 Code Signing & Security Policy
+
+Free code signing provided by [SignPath.io](https://signpath.io/), certificate by [SignPath Foundation](https://signpath.org/).
+For details on build provenance, release approvals, privacy, and vulnerability reporting, see [SECURITY.md](SECURITY.md).
 
 ## ⚖️ License
 

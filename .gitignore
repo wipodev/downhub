@@ -1,10 +1,21 @@
-venv/
-.venv
+# Python & Virtual Environments
 __pycache__/
-*.crx
-*.pem
-keys/
+*.py[cod]
+.venv/
+venv/
+
+# Build & Dist Artifacts
 build/
 dist/
-bin/
+*.exe
+*.zip
+
+# Bundled External Binaries (downloaded during CI build)
+bin/*.exe
 *.ini
+
+# Generated Local Keys / Logs
+keys/
+*.log
+*.crx
+*.pem
