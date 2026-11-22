@@ -5,18 +5,15 @@ import subprocess
 import os
 import logging
 import time
-import shutil
-import zipfile
-import urllib.request
 from pathlib import Path
+
+from updater import GitHubUpdater
 
 # -----------------------------
 # App Metadata & Protocol
 # -----------------------------
-APP_VERSION = "1.2.1"
+APP_VERSION = "1.2.0"
 GITHUB_REPO = "wipodev/downhub"
-SERVICE_ASSET_NAME = "DownHubService.exe"
-EXTENSION_ASSET_NAME = "extension.zip"
 
 MESSAGES = {
     "PROGRESS": "NATIVE_PROGRESS",
@@ -82,116 +79,26 @@ def get_downloads_folder():
     return Path(os.environ["USERPROFILE"]) / "Downloads"
 
 # -----------------------------
-# Modular Self-Updater (Service & Extension)
+# Modular App & Engine Updaters
 # -----------------------------
 
-def cleanup_old_binary():
-    """Remove leftover .old executable from a previous hot-swap update."""
-    old_exe = BASE_DIR / f"{SERVICE_ASSET_NAME}.old"
-    if old_exe.exists():
-        try:
-            old_exe.unlink()
-            logging.info("Cleaned up old binary from previous update.")
-        except OSError:
-            pass
+def run_background_app_update():
+    """Silently check GitHub Releases and hot-swap modified components for the next run."""
+    targets = {
+        "DownHubService.exe": BASE_DIR / "DownHubService.exe",
+    }
+    if EXTENSION_DIR.exists():
+        targets["extension.zip"] = EXTENSION_DIR
 
-def _parse_version(version_str):
-    """Convert a version string like 'v1.2.0' into a comparable tuple of integers."""
-    clean = version_str.lstrip("vV").strip()
-    return tuple(int(part) for part in clean.split(".") if part.isdigit())
-
-def _download_file(url, dest_path):
-    """Download a file from a URL to a local Path using a custom User-Agent."""
-    req = urllib.request.Request(url, headers={"User-Agent": f"DownHub/{APP_VERSION}"})
-    with urllib.request.urlopen(req, timeout=30) as response, open(dest_path, "wb") as out_file:
-        shutil.copyfileobj(response, out_file)
-
-def check_app_update():
-    """Check GitHub Releases once every 24h and hot-swap only modified components."""
-    cleanup_old_binary()
-
-    # Only run self-replacement when running as compiled executable
-    if not getattr(sys, 'frozen', False):
-        return
-
-    now = time.time()
-    update_interval = 86400  # 24 hours
-
-    if APP_STAMP_FILE.exists():
-        try:
-            last_check = float(APP_STAMP_FILE.read_text().strip())
-            if (now - last_check) < update_interval:
-                return
-        except ValueError:
-            pass
-
-    APP_STAMP_FILE.write_text(str(now))
-    api_url = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-    logging.info(f"Checking for DownHub updates at {api_url}")
-
-    try:
-        req = urllib.request.Request(
-            api_url,
-            headers={"User-Agent": f"DownHub/{APP_VERSION}", "Accept": "application/vnd.github+json"}
-        )
-        with urllib.request.urlopen(req, timeout=8) as response:
-            release_data = json.loads(response.read().decode("utf-8"))
-
-        latest_tag = release_data.get("tag_name", "")
-        if not latest_tag or _parse_version(latest_tag) <= _parse_version(APP_VERSION):
-            logging.info(f"DownHub is up to date (current: {APP_VERSION}, latest: {latest_tag})")
-            return
-
-        assets = {a.get("name"): a.get("browser_download_url") for a in release_data.get("assets", [])}
-        updated_anything = False
-
-        # 1. Update extension files ONLY if extension.zip was attached to this release
-        if EXTENSION_ASSET_NAME in assets and EXTENSION_DIR.exists():
-            logging.info(f"Downloading extension update ({latest_tag})...")
-            send_message({
-                "type": MESSAGES["PROGRESS"],
-                "percent": 0,
-                "status": f"Actualizando extensión a {latest_tag}..."
-            })
-            zip_tmp = BASE_DIR / f"{EXTENSION_ASSET_NAME}.tmp"
-            _download_file(assets[EXTENSION_ASSET_NAME], zip_tmp)
-            with zipfile.ZipFile(zip_tmp, "r") as zf:
-                zf.extractall(EXTENSION_DIR)
-            zip_tmp.unlink(missing_ok=True)
-            updated_anything = True
-            logging.info("Extension files updated successfully.")
-
-        # 2. Hot-swap DownHubService.exe ONLY if attached to this release
-        if SERVICE_ASSET_NAME in assets:
-            logging.info(f"Downloading service binary update ({latest_tag})...")
-            send_message({
-                "type": MESSAGES["PROGRESS"],
-                "percent": 0,
-                "status": f"Actualizando servicio a {latest_tag}..."
-            })
-            current_exe = Path(sys.executable)
-            new_exe = BASE_DIR / f"{SERVICE_ASSET_NAME}.new"
-            old_exe = BASE_DIR / f"{SERVICE_ASSET_NAME}.old"
-
-            _download_file(assets[SERVICE_ASSET_NAME], new_exe)
-
-            # Rename running exe -> .old, then move .new -> DownHubService.exe
-            if old_exe.exists():
-                old_exe.unlink(missing_ok=True)
-            current_exe.rename(old_exe)
-            new_exe.replace(current_exe)
-            updated_anything = True
-            logging.info("DownHubService.exe hot-swapped successfully.")
-
-        if updated_anything:
-            logging.info(f"DownHub silently updated to {latest_tag} for next run.")
-
-    except Exception as e:
-        logging.warning(f"Modular update check failed: {e}")
-
-# -----------------------------
-# yt-dlp Auto-Update Logic
-# -----------------------------
+    updater = GitHubUpdater(
+        repo=GITHUB_REPO,
+        current_version=APP_VERSION,
+        asset_targets=targets,
+        stamp_file=APP_STAMP_FILE,
+    )
+    result = updater.check_and_update()
+    if result.updated:
+        logging.info(f"DownHub silently updated to {result.latest_version} for next run.")
 
 def ensure_ytdlp_updated(force=False):
     """Update yt-dlp.exe if more than 24 hours have passed since the last check, or if forced."""
@@ -244,7 +151,6 @@ def download_video(url, filename):
         send_message({"type": MESSAGES["ERROR"], "message": f"Falta yt-dlp.exe en {BASE_DIR}"})
         os._exit(1)
 
-    # Only check yt-dlp daily update before starting (fast and prevents 403)
     ensure_ytdlp_updated(force=False)
 
     cmd = [
@@ -308,10 +214,8 @@ def download_video(url, filename):
         logging.info(f"Download finished with return code: {current_process.returncode}")
 
         if current_process.returncode == 0:
-            # 1. Deliver the video to the user FIRST
             send_message({"type": MESSAGES["DONE"]})
-            # 2. Silently check and hot-swap app updates in the background before exiting
-            check_app_update()
+            run_background_app_update()
             os._exit(0)
         else:
             if current_process.returncode < 0:
@@ -323,8 +227,7 @@ def download_video(url, filename):
                     last_error = "YouTube bloqueó la descarga (403). Motor actualizado: intenta de nuevo."
                 send_message({"type": MESSAGES["ERROR"], "message": last_error})
                 logging.error(f"Download failed: {last_error}")
-                # Check for app updates on failure as well in case a fix was released
-                check_app_update()
+                run_background_app_update()
             os._exit(1)
 
     except Exception as e:
