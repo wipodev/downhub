@@ -1,3 +1,5 @@
 crx3==0.0.4
 nuitka==4.3.5
+zstandard==0.25.0
+pillow==13.0.0
 git+https://github.com/wipodev/updater.git@v0.1.0

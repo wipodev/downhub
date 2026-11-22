@@ -9,7 +9,9 @@ from pathlib import Path
 
 # --- PATH CONFIGURATION ---
 APPDATA = os.environ.get('LOCALAPPDATA')
-INNO_SETUP_EXE = Path(APPDATA) / "Programs/Inno Setup 6/ISCC.exe"
+LOCAL_ISCC = Path(APPDATA) / "Programs/Inno Setup 6/ISCC.exe"
+SYSTEM_ISCC = Path(r"C:\Program Files (x86)\Inno Setup 6\ISCC.exe")
+INNO_SETUP_EXE = LOCAL_ISCC if LOCAL_ISCC.exists() else SYSTEM_ISCC
 BASE_DIR = Path(__file__).parent
 
 VERSION_FILE = BASE_DIR / "VERSION"
