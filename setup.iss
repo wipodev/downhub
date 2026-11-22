@@ -4,7 +4,7 @@ AppVersion=1.2.3
 AppPublisher=WipoDev
 AppPublisherURL=https://github.com/wipodev/downhub
 AppSupportURL=https://github.com/wipodev/downhub/issues
-AppUpdatesURL=https://github.com/wipodev/downhub/release
+AppUpdatesURL=https://github.com/wipodev/downhub/releases
 VersionInfoCompany=WipoDev
 VersionInfoCopyright=© 2026 WipoDev. Apache 2.0 License.
 VersionInfoDescription=Instalador de DownHub
@@ -50,3 +50,11 @@ begin
           mbInformation, MB_OK);
   end;
 end;
+
+[UninstallDelete]
+Type: files; Name: "{app}\debug_native.log"
+Type: files; Name: "{app}\.last_app_update"
+Type: files; Name: "{app}\DownHubService.exe.old"
+Type: files; Name: "{app}\bin\.last_ytdlp_update"
+Type: dirifempty; Name: "{app}\bin"
+Type: dirifempty; Name: "{app}"
