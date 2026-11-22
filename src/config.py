@@ -25,6 +25,7 @@ APP_STAMP_FILE = BASE_DIR / ".last_app_update"
 
 YTDLP_PATH = BASE_DIR / "bin" / "yt-dlp.exe"
 FFMPEG_PATH = BASE_DIR / "bin" / "ffmpeg.exe"
+DENO_PATH = BASE_DIR / "bin" / "deno.exe"
 EXTENSION_DIR = BASE_DIR / "extension"
 
 

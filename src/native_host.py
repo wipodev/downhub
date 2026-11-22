@@ -10,6 +10,7 @@ from config import (
     BASE_DIR,
     YTDLP_PATH,
     FFMPEG_PATH,
+    DENO_PATH,
     get_downloads_folder,
     setup_logging,
 )
@@ -45,6 +46,9 @@ def download_video(url: str, filename: str) -> None:
         "--progress",
         "--no-playlist",
     ]
+
+    if DENO_PATH.exists():
+        cmd.extend(["--js-runtimes", f"deno:{DENO_PATH}"])
 
     last_error = "Error en el proceso de descarga"
 
