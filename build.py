@@ -144,6 +144,10 @@ def main():
     clean_folders()
     sync_service_version(service_version)
 
+    if "--sync" in args or "sync" in args or "-s" in args:
+        print(f"--- SINCRONIZACIÓN FINALIZADA (Service: v{service_version}) ---")
+        return
+
     if "--keys" in args or "keys" in args or "-k" in args:
         print("Generating extension key and updating files...")
         run_command("python extension_key.py", "key")

@@ -17,6 +17,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Verify tag matches VERSION file
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          $tagVersion = "${{ github.ref_name }}".TrimStart('v', 'V')
+          $fileVersion = (Get-Content "VERSION" -Raw).Trim().TrimStart('v', 'V')
+          if ($tagVersion -ne $fileVersion) {
+            Write-Error "Tag version ($tagVersion) does not match VERSION file ($fileVersion). Run 'python build.py --sync' and commit first."
+            exit 1
+          }
+
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
