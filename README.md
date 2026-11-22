@@ -36,7 +36,7 @@ downhub/
 
 ### End Users (Recommended)
 
-Download the latest signed Windows installer (`DownHub_Installer.exe`) directly from the [GitHub Releases](https://www.google.com/search?q=https://github.com/wipodev/downhub/releases) page and run it.
+Download the latest signed Windows installer (`DownHub_Installer.exe`) directly from the [GitHub Releases](https://github.com/wipodev/downhub/releases) page and run it.
 
 ### Building from Source
 
