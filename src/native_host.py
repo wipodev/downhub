@@ -184,11 +184,7 @@ def check_app_update():
             logging.info("DownHubService.exe hot-swapped successfully.")
 
         if updated_anything:
-            send_message({
-                "type": MESSAGES["ERROR"],
-                "message": f"DownHub actualizado a {latest_tag}. Pulsa descargar nuevamente."
-            })
-            os._exit(0)
+            logging.info(f"DownHub silently updated to {latest_tag} for next run.")
 
     except Exception as e:
         logging.warning(f"Modular update check failed: {e}")
@@ -248,10 +244,7 @@ def download_video(url, filename):
         send_message({"type": MESSAGES["ERROR"], "message": f"Falta yt-dlp.exe en {BASE_DIR}"})
         os._exit(1)
 
-    # 1. Check modular updates (DownHubService.exe / extension.zip)
-    check_app_update()
-
-    # 2. Check yt-dlp binary daily update
+    # Only check yt-dlp daily update before starting (fast and prevents 403)
     ensure_ytdlp_updated(force=False)
 
     cmd = [
@@ -315,7 +308,10 @@ def download_video(url, filename):
         logging.info(f"Download finished with return code: {current_process.returncode}")
 
         if current_process.returncode == 0:
+            # 1. Deliver the video to the user FIRST
             send_message({"type": MESSAGES["DONE"]})
+            # 2. Silently check and hot-swap app updates in the background before exiting
+            check_app_update()
             os._exit(0)
         else:
             if current_process.returncode < 0:
@@ -327,6 +323,8 @@ def download_video(url, filename):
                     last_error = "YouTube bloqueó la descarga (403). Motor actualizado: intenta de nuevo."
                 send_message({"type": MESSAGES["ERROR"], "message": last_error})
                 logging.error(f"Download failed: {last_error}")
+                # Check for app updates on failure as well in case a fix was released
+                check_app_update()
             os._exit(1)
 
     except Exception as e:
